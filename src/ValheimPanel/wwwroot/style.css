@@ -1,0 +1,209 @@
+:root {
+    --fog: #d8d7cf;
+    --stone: #cfcdc3;
+    --edge: #a9a79c;
+    --ink: #22272b;
+    --muted: #5d656b;
+    --pine: #34614a;
+    --ember: #8f3a26;
+    --rune: #2c4657;
+
+    --state: var(--muted);
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--fog);
+    color: var(--ink);
+    font-family: "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+main {
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 0 1rem 4rem;
+}
+
+h2 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin: 0 0 0.75rem;
+    color: var(--muted);
+}
+
+/* --- token gate ------------------------------------------------------- */
+
+.gate {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+}
+
+.gate-box {
+    width: min(24rem, 100%);
+    background: var(--stone);
+    border: 1px solid var(--edge);
+    padding: 1.5rem;
+}
+
+.gate-box h1 { margin: 0 0 0.25rem; font-size: 1.5rem; }
+.gate-box p { margin: 0 0 1rem; color: var(--muted); font-size: 0.9rem; }
+
+/* --- hero: the one loud element --------------------------------------- */
+
+.hero {
+    border-left: 6px solid var(--state);
+    padding: 2.5rem 0 2.5rem 1.25rem;
+    margin: 2rem 0 1.5rem;
+}
+
+.hero-world {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.hero-state {
+    margin: 0.15rem 0;
+    font-size: clamp(2.25rem, 9vw, 3.5rem);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--state);
+}
+
+.hero-detail { margin: 0; color: var(--muted); }
+
+/* --- facts ------------------------------------------------------------ */
+
+.facts {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    border-top: 1px solid var(--edge);
+    border-left: 1px solid var(--edge);
+    margin-bottom: 2rem;
+}
+
+.facts div {
+    border-right: 1px solid var(--edge);
+    border-bottom: 1px solid var(--edge);
+    padding: 0.75rem;
+}
+
+.facts span { display: block; font-size: 0.78rem; color: var(--muted); }
+.facts strong { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* --- buttons ---------------------------------------------------------- */
+
+button {
+    font: inherit;
+    font-weight: 600;
+    color: var(--fog);
+    background: var(--rune);
+    border: none;
+    padding: 0.7rem 1.1rem;
+    cursor: pointer;
+}
+
+button:hover:not(:disabled) { filter: brightness(1.2); }
+button:disabled { background: var(--edge); color: var(--muted); cursor: not-allowed; }
+button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+button.go { background: var(--pine); }
+button.danger { background: var(--ember); }
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 2.5rem;
+}
+
+.controls button { flex: 1 1 8rem; }
+
+/* --- blocks ----------------------------------------------------------- */
+
+.block {
+    border-top: 1px solid var(--edge);
+    padding-top: 1.25rem;
+    margin-bottom: 2.5rem;
+}
+
+.update-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.75rem 0;
+}
+
+.update-row + .update-row { border-top: 1px solid var(--edge); }
+.update-row p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+.hint { margin: -0.4rem 0 1rem; font-size: 0.85rem; color: var(--muted); }
+
+/* --- form ------------------------------------------------------------- */
+
+form label {
+    display: block;
+    margin-bottom: 0.9rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+form input[type="text"],
+form input[type="number"],
+form input[type="password"],
+.gate-box input {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    font: inherit;
+    color: var(--ink);
+    background: var(--stone);
+    border: 1px solid var(--edge);
+    padding: 0.55rem 0.7rem;
+}
+
+.gate-box input { margin-bottom: 0.75rem; }
+.gate-box button { width: 100%; }
+
+form label.check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--ink);
+    font-size: 0.95rem;
+}
+
+form label.check input { margin: 0; width: 1.05rem; height: 1.05rem; accent-color: var(--pine); }
+
+.error { color: var(--ember); font-weight: 600; }
+.ok { color: var(--pine); font-weight: 600; }
+
+/* --- logs ------------------------------------------------------------- */
+
+pre {
+    background: var(--ink);
+    color: #c8ccc4;
+    padding: 0.9rem;
+    margin: 0;
+    max-height: 22rem;
+    overflow: auto;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .hero-state { transition: color 200ms ease; }
+    .hero { transition: border-color 200ms ease; }
+}

@@ -1,0 +1,48 @@
+{
+  "name": "Valheim",
+  "slug": "valheim",
+  "categories": [24],
+  "date_created": "2026-09-04",
+  "type": "ct",
+  "updateable": true,
+  "privileged": false,
+  "interface_port": 8099,
+  "documentation": "https://github.com/boehla/valheim-panel#readme",
+  "website": "https://www.valheimgame.com/",
+  "repository": "https://github.com/boehla/valheim-panel",
+  "architectures": ["amd64"],
+  "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/valheim.webp",
+  "description": "Valheim dedicated server with a small web panel for status, start/stop, SteamCMD updates and server settings.",
+  "install_methods": [
+    {
+      "type": "default",
+      "script": "ct/valheim.sh",
+      "config_path": "/etc/valheim/server.env",
+      "resources": {
+        "cpu": 4,
+        "ram": 8192,
+        "hdd": 16,
+        "os": "Debian",
+        "version": "13"
+      }
+    }
+  ],
+  "default_credentials": {
+    "username": null,
+    "password": null
+  },
+  "notes": [
+    {
+      "text": "The panel access token is generated during install and stored in /opt/valheim-panel/.env.",
+      "type": "info"
+    },
+    {
+      "text": "A randomly generated server password is written to /etc/valheim/server.env — change it in the panel before inviting players.",
+      "type": "warning"
+    },
+    {
+      "text": "8 GB RAM is a realistic minimum for a full 10-player world. The initial SteamCMD download is roughly 2.5 GB.",
+      "type": "info"
+    }
+  ]
+}

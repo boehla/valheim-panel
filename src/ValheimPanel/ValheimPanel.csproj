@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>ValheimPanel</AssemblyName>
+    <RootNamespace>ValheimPanel</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Linux-only by design; File.SetUnixFileMode is fine here -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+
+    <!-- Single self-contained binary: no dotnet runtime needed in the LXC -->
+    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+
+    <!-- wwwroot is compiled into the assembly, otherwise PublishSingleFile still
+         drops a loose wwwroot folder next to the binary and the singlefile
+         deploy mode of fetch_and_deploy_gh_release would ship a broken UI. -->
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="wwwroot\**" />
+    <EmbeddedResource Include="wwwroot\**" />
+  </ItemGroup>
+
+</Project>

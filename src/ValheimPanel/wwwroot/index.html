@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Valheim Server</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="gate" class="gate">
+  <form id="gate-form" class="gate-box">
+    <h1>Valheim Server</h1>
+    <p>Zugriffstoken eingeben. Es steht in <code>/opt/valheim-panel/.env</code>.</p>
+    <input type="password" id="token" autocomplete="current-password" placeholder="Token" required>
+    <button type="submit">Anmelden</button>
+    <p id="gate-error" class="error" hidden></p>
+  </form>
+</div>
+
+<main id="app" hidden>
+
+  <header class="hero" id="hero">
+    <p class="hero-world" id="hero-world">–</p>
+    <h1 class="hero-state" id="hero-state">verbinde …</h1>
+    <p class="hero-detail" id="hero-detail"></p>
+  </header>
+
+  <section class="facts">
+    <div><span>Spieler online</span><strong id="fact-players">–</strong></div>
+    <div><span>Build</span><strong id="fact-build">–</strong></div>
+    <div><span>Welt gespeichert</span><strong id="fact-saved">–</strong></div>
+    <div><span>Weltgröße</span><strong id="fact-size">–</strong></div>
+  </section>
+
+  <section class="controls">
+    <button id="btn-start" class="go">Server starten</button>
+    <button id="btn-restart">Neu starten</button>
+    <button id="btn-stop" class="danger">Server stoppen</button>
+  </section>
+
+  <section class="block">
+    <h2>Updates</h2>
+    <div class="update-row">
+      <div>
+        <strong>Valheim Dedicated Server</strong>
+        <p id="server-build">Build <span>–</span></p>
+      </div>
+      <button id="btn-update-server">Über SteamCMD aktualisieren</button>
+    </div>
+    <div class="update-row">
+      <div>
+        <strong>Panel</strong>
+        <p id="panel-version">–</p>
+      </div>
+      <button id="btn-update-panel" disabled>Suche …</button>
+    </div>
+  </section>
+
+  <section class="block" id="job-block" hidden>
+    <h2 id="job-title">Job</h2>
+    <pre id="job-log"></pre>
+  </section>
+
+  <section class="block">
+    <h2>Einstellungen</h2>
+    <p class="hint">Änderungen greifen beim nächsten Neustart des Servers.</p>
+    <form id="settings">
+      <label>Servername <input name="serverName" required></label>
+      <label>Weltname <input name="worldName" required></label>
+      <label>Passwort <input name="password" type="text" minlength="5"></label>
+      <label>Port <input name="port" type="number" min="1024" max="65530"></label>
+      <label>Speicherort <input name="saveDir"></label>
+      <label>Backups behalten <input name="backups" type="number" min="0" max="99"></label>
+      <label>Backup-Intervall kurz (s) <input name="backupShort" type="number" min="600"></label>
+      <label>Backup-Intervall lang (s) <input name="backupLong" type="number" min="600"></label>
+      <label class="check"><input name="crossplay" type="checkbox"> Crossplay (PlayFab statt Portfreigabe)</label>
+      <label class="check"><input name="public" type="checkbox"> In der Serverliste zeigen</label>
+      <label class="check"><input name="autoUpdateServer" type="checkbox"> Beim Start automatisch auf neue Version prüfen</label>
+      <button type="submit">Einstellungen speichern</button>
+      <p id="settings-msg" hidden></p>
+    </form>
+  </section>
+
+  <section class="block">
+    <h2>Log</h2>
+    <pre id="log">–</pre>
+  </section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

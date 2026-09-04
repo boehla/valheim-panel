@@ -1,0 +1,99 @@
+# valheim-panel
+
+A Valheim dedicated server in a Proxmox LXC, plus a small web panel to run it.
+
+The panel shows whether the server is up, how many players are connected, and which
+Steam build is installed. It can start, stop and restart the server, run a SteamCMD
+update, edit the server settings, and update itself from this repository's releases.
+
+Written in ASP.NET Core and shipped as one self-contained binary, so the container
+needs no runtime, no Node, and no Docker.
+
+## Install
+
+Run on the **Proxmox host** shell:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/boehla/valheim-panel/main/proxmox/ct/valheim.sh)"
+```
+
+Defaults: Debian 13, 4 cores, 8 GB RAM, 16 GB disk, unprivileged. The initial
+SteamCMD download is around 2.5 GB, so the first run takes a while.
+
+When it finishes, open `http://<container-ip>:8099`. The access token is in
+`/opt/valheim-panel/.env`.
+
+## What lives where
+
+| Path | Contents |
+|---|---|
+| `/opt/valheim/server` | Game server files (SteamCMD app 896660) |
+| `/opt/valheim/data` | Worlds and the server's own backups |
+| `/etc/valheim/server.env` | Server settings, written by the panel |
+| `/opt/valheim-panel` | Panel binary, `.env`, `VERSION` |
+
+Two systemd units: `valheim` and `valheim-panel`.
+
+`valheim.service` stops with `SIGINT`, which is the only signal Valheim treats as a
+clean shutdown. On `SIGTERM` the world is not written and the last session is lost.
+
+## Releasing
+
+`fetch_and_deploy_gh_release` and the panel's self-update both read GitHub releases,
+so a tag is what publishes an update:
+
+```bash
+git tag v0.1.0 && git push --tags
+```
+
+The workflow in `.github/workflows/release.yml` publishes
+`valheim-panel-linux-x64` as a release asset. Both the asset name and the deployed
+binary name (`/opt/valheim-panel/valheim-panel`) are referenced from the install
+script and from `SelfUpdate.cs` — change one, change all three.
+
+Self-update never overwrites the running process. The new binary is staged as
+`valheim-panel.new` and an `ExecStartPre` in the unit swaps it in on the next start.
+
+## Contributing the script upstream
+
+The Proxmox scripts under `proxmox/` are kept here for direct installs. To submit
+them to the community catalog they go into a fork of
+[`community-scripts/ProxmoxVED`](https://github.com/community-scripts/ProxmoxVED)
+(not ProxmoxVE — that repo is for fixes to already-published scripts):
+
+```
+ct/valheim.sh
+install/valheim-install.sh
+json/valheim.json
+```
+
+The source line at the top of `ct/valheim.sh` is already ProxmoxVED's local-first
+form, so the same file runs from a checkout, a fork, or a curl pipe unmodified.
+
+## Security
+
+The panel runs as root and shells out to `systemctl` and SteamCMD. Treat it as an
+admin interface:
+
+- Keep it on the LAN. Do not expose port 8099 to the internet.
+- If you want remote access, put it behind a reverse proxy with its own auth.
+- The token in `/opt/valheim-panel/.env` is the only thing between a visitor and a
+  shell-equivalent surface. Rotate it if it leaks, and restart the unit.
+
+## Valheim 1.0
+
+Version 1.0 lands on 9 September 2026 with the Deep North biome. Two things matter
+for a server:
+
+- The Deep North only generates in terrain that has never been explored. Iron Gate
+  recommends a fresh world for the full experience. Decide before launch day —
+  switching later costs the group its progress.
+- Iron Gate does not guarantee mods will load on 1.0. This setup installs no mod
+  loader, which is deliberate.
+
+`AUTO_UPDATE=1` (the default) makes the server check SteamCMD on every start, so the
+1.0 build arrives with the next restart on its own.
+
+## License
+
+MIT
