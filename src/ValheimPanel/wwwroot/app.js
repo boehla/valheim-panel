@@ -80,13 +80,14 @@ function renderStatus(s) {
         : "";
 
     $("fact-players").textContent = s.running ? s.playersOnline : "–";
-    $("fact-build").textContent = s.buildId || "–";
+    $("fact-build").textContent = s.gameVersion || s.buildId || "–";
     $("fact-saved").textContent = s.worldSavedAt
         ? new Date(s.worldSavedAt).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })
         : "–";
     $("fact-size").textContent = s.worldSizeBytes ? `${(s.worldSizeBytes / 1048576).toFixed(1)} MB` : "–";
 
-    $("server-build").querySelector("span").textContent = s.buildId || "unbekannt";
+    $("server-build").querySelector("span").textContent =
+        s.gameVersion ? `${s.gameVersion}${s.buildId ? ` (Build ${s.buildId})` : ""}` : (s.buildId || "unbekannt");
     $("panel-version").dataset.current = s.panelVersion;
 
     $("btn-start").disabled = s.running;

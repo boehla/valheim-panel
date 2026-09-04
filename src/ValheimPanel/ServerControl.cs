@@ -7,6 +7,7 @@ public class ServerStatus {
     public bool Running { get; set; }
     public DateTime? StartedAt { get; set; }
     public string BuildId { get; set; } = "";
+    public string GameVersion { get; set; } = "";
     public int PlayersOnline { get; set; }
     public string WorldName { get; set; } = "";
     public long WorldSizeBytes { get; set; }
@@ -27,6 +28,12 @@ public static partial class ServerControl {
     [GeneratedRegex(@"Closing socket (\d+)")]
     private static partial Regex DisconnectRegex();
 
+    // "Valheim version: l-0.221.12 (network version 36)". The l- is a platform tag.
+    // Requiring a dotted number is what keeps this off the "network version 36" on
+    // the same line, and off the "Console: Valheim l-0.221.12" line that follows.
+    [GeneratedRegex(@"Valheim version:\s*(?:[a-z]-)?(\d+(?:\.\d+)+)")]
+    private static partial Regex GameVersionRegex();
+
     public static async Task<ServerStatus> GetStatusAsync() {
         ServerSettings settings = ServerSettings.Load();
         ServerStatus status = new ServerStatus {
@@ -40,6 +47,8 @@ public static partial class ServerControl {
 
         string startedRaw = await Shell.ServicePropertyAsync(Unit, "ExecMainStartTimestamp");
         if(DateTime.TryParse(startedRaw, out DateTime started)) status.StartedAt = started;
+
+        status.GameVersion = await readGameVersionAsync(startedRaw);
 
         string worldFile = Path.Combine(settings.SaveDir, "worlds_local", $"{settings.WorldName}.db");
         if(File.Exists(worldFile)) {
@@ -98,6 +107,32 @@ public static partial class ServerControl {
             log("Starte Server ...");
             await StartAsync();
         }
+    }
+
+    static string gameVersion = "";
+    static string gameVersionRun = "";
+
+    /// <summary>
+    /// Valheim prints its version a second or two after start, so this is read from
+    /// the journal rather than from the game files. Cached against the unit's start
+    /// timestamp: the version cannot change without a restart, and the status
+    /// endpoint is polled every five seconds.
+    /// </summary>
+    static async Task<string> readGameVersionAsync(string runKey) {
+        if(runKey.Length > 0 && runKey == gameVersionRun && gameVersion.Length > 0) return gameVersion;
+
+        ShellResult res = await Shell.RunAsync("/usr/bin/journalctl",
+            ["-u", Unit, "--no-pager", "-o", "cat", "--grep", "Valheim version:", "-n", "1"]);
+        if(!res.Ok) return gameVersion;
+
+        Match match = GameVersionRegex().Match(res.StdOut);
+        if(!match.Success) return gameVersion;
+
+        // Only a hit is cached. A miss right after start would otherwise stick for
+        // the whole run, because the cache key is the start timestamp.
+        gameVersion = match.Groups[1].Value;
+        gameVersionRun = runKey;
+        return gameVersion;
     }
 
     static string readBuildId() {
