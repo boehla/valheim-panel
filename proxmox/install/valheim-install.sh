@@ -33,6 +33,15 @@ msg_ok "Installed Valheim Dedicated Server"
 
 fetch_and_deploy_gh_release "valheim-panel" "boehla/valheim-panel" "singlefile" "latest" "/opt/valheim-panel" "valheim-panel-linux-x64"
 
+# fetch_and_deploy_gh_release records the deployed tag in $HOME/.<app>, but the
+# panel reads its own VERSION file -- that is what SelfUpdate writes as
+# VERSION.new and what the unit's ExecStartPre swaps in. Without seeding it here
+# a fresh install reports version "dev" and offers an update to the very release
+# it just installed.
+if [ -f "$HOME/.valheim-panel" ]; then
+  cp "$HOME/.valheim-panel" /opt/valheim-panel/VERSION
+fi
+
 msg_info "Configuring Valheim"
 mkdir -p /etc/valheim
 cat <<EOF >/etc/valheim/server.env
