@@ -65,6 +65,13 @@ function update_script() {
 
     restore_backup
 
+    # Same reason as in the install script: the deploy helper records the tag in
+    # $HOME/.<app>, but the panel reads its own VERSION file. CLEAN_INSTALL wipes
+    # the directory, so this has to come after the deploy, not before.
+    if [ -f "$HOME/.valheim-panel" ]; then
+      cp "$HOME/.valheim-panel" /opt/valheim-panel/VERSION
+    fi
+
     msg_info "Starting Panel"
     systemctl start valheim-panel
     msg_ok "Started Panel"
