@@ -13,6 +13,12 @@
 
 * { box-sizing: border-box; }
 
+/* Must outrank every class rule below. `.gate` sets `display: grid`, and a class
+   selector beats the browser's `[hidden] { display: none }`, so `el.hidden = true`
+   would set the attribute and change nothing -- the login gate stayed on screen
+   covering the app even after a successful login. */
+[hidden] { display: none !important; }
+
 body {
     margin: 0;
     background: var(--fog);
