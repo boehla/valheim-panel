@@ -67,8 +67,12 @@ install/valheim-install.sh
 json/valheim.json
 ```
 
-The source line at the top of `ct/valheim.sh` is already ProxmoxVED's local-first
-form, so the same file runs from a checkout, a fork, or a curl pipe unmodified.
+The boot block at the top of `ct/valheim.sh` is ProxmoxVED's current local-first
+form: the engine comes from [`community-scripts/core`](https://github.com/community-scripts/core),
+so the same file runs from a checkout, a fork, or a curl pipe. The one addition is
+`COMMUNITY_SCRIPTS_URL`, which points the engine back at this repo so it finds
+`install/valheim-install.sh` here instead of in ProxmoxVED. **Delete that line when
+submitting upstream** — once the scripts live in ProxmoxVED, its default is correct.
 
 ## Security
 

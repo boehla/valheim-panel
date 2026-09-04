@@ -1,5 +1,22 @@
 #!/usr/bin/env bash
-source "$(dirname "${BASH_SOURCE[0]}")/../misc/build.func" 2>/dev/null || source <(curl -fsSL "${COMMUNITY_SCRIPTS_URL:-https://raw.githubusercontent.com/community-scripts/ProxmoxVED/main}/misc/build.func")
+# The engine lives in community-scripts/core; this repo only ships the scripts.
+# A local core checkout wins (COMMUNITY_SCRIPTS_CORE_DIR, else a sibling ../../core),
+# so a fork or branch of core can be tested without editing this file.
+#
+# COMMUNITY_SCRIPTS_URL points the engine back at THIS repo, otherwise it looks
+# for install/valheim-install.sh and json/valheim.json in ProxmoxVED and 404s.
+# Drop this line if the scripts are ever merged into ProxmoxVED itself.
+COMMUNITY_SCRIPTS_URL="${COMMUNITY_SCRIPTS_URL:-https://raw.githubusercontent.com/boehla/valheim-panel/main/proxmox}"
+_cs_boot="${COMMUNITY_SCRIPTS_CORE_DIR:-$(dirname "${BASH_SOURCE[0]}")/../../core}/core/build.func"
+source "$_cs_boot" 2>/dev/null || source <(curl -fsSL "${COMMUNITY_SCRIPTS_CORE_URL:-https://raw.githubusercontent.com/community-scripts/core/main}/core/build.func")
+# A failed download leaves an empty process substitution, which sources cleanly and
+# leaves every function undefined -- the script then runs to the end printing
+# "command not found" and a success banner. Fail loudly instead.
+if ! declare -f build_container >/dev/null 2>&1; then
+  echo "ERROR: could not load the community-scripts engine (core/build.func)." >&2
+  echo "       Check network access to raw.githubusercontent.com." >&2
+  exit 1
+fi
 # Copyright (c) 2021-2026 community-scripts ORG
 # Author: Daniel (boehla)
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
