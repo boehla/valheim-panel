@@ -27,6 +27,17 @@
     <p class="hero-detail" id="hero-detail"></p>
   </header>
 
+  <section class="join" id="join" hidden>
+    <div>
+      <span>Beitritts-Code (Crossplay)</span>
+      <strong id="join-code">–</strong>
+    </div>
+    <div>
+      <span>Direkte Verbindung</span>
+      <strong id="join-address">–</strong>
+    </div>
+  </section>
+
   <section class="facts">
     <div><span>Spieler online</span><strong id="fact-players">–</strong></div>
     <div><span>Version</span><strong id="fact-build">–</strong></div>
@@ -77,6 +88,8 @@
       <label>Backup-Intervall lang (s) <input name="backupLong" type="number" min="600"></label>
       <label class="check"><input name="crossplay" type="checkbox"> Crossplay (PlayFab statt Portfreigabe)</label>
       <label class="check"><input name="public" type="checkbox"> In der Serverliste zeigen</label>
+      <p class="hint">Der Beitritts-Code entsteht erst, wenn Valheim die Session öffentlich
+      registriert — Crossplay allein reicht nicht, beide Haken müssen gesetzt sein.</p>
       <label class="check"><input name="autoUpdateServer" type="checkbox"> Beim Start automatisch auf neue Version prüfen</label>
       <button type="submit">Einstellungen speichern</button>
       <p id="settings-msg" hidden></p>

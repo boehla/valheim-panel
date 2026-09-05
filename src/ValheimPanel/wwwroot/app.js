@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 
 let token = sessionStorage.getItem("panelToken") || "";
+let settingsLoaded = false;
 
 async function api(path, options = {}) {
     const res = await fetch(path, {
@@ -79,6 +80,8 @@ function renderStatus(s) {
         ? `seit ${new Date(s.startedAt).toLocaleString("de-AT")}`
         : "";
 
+    renderJoin(s);
+
     $("fact-players").textContent = s.running ? s.playersOnline : "–";
     $("fact-build").textContent = s.gameVersion || s.buildId || "–";
     $("fact-saved").textContent = s.worldSavedAt
@@ -93,6 +96,43 @@ function renderStatus(s) {
     $("btn-start").disabled = s.running;
     $("btn-stop").disabled = !s.running;
 }
+
+/* --- join ------------------------------------------------------------- */
+
+// PlayFab issues the code a few seconds after start, so an empty one is normal at
+// first. Valheim only registers the session — and only then hands out a code — when
+// the server is public, so crossplay alone leaves the field empty forever.
+function renderJoin(s) {
+    $("join").hidden = !s.running;
+    if (!s.running) return;
+
+    const form = $("settings").elements;
+    const upSeconds = s.startedAt ? (Date.now() - new Date(s.startedAt)) / 1000 : 0;
+    const code = $("join-code");
+    // The first refresh can beat loadSettings, and unchecked boxes would then read
+    // as a misconfiguration that isn't there.
+    code.textContent = s.joinCode || (
+        !settingsLoaded ? "wird vergeben …"
+            : !form.crossplay.checked ? "Crossplay ist aus"
+                : !form.public.checked ? "braucht „In der Serverliste zeigen“"
+                    : upSeconds > 60 ? "kein Code — Log prüfen"
+                        : "wird vergeben …");
+    code.classList.toggle("small", !s.joinCode);
+    code.dataset.copy = s.joinCode;
+
+    const port = $("settings").elements.port.value || "2456";
+    const address = `${location.hostname}:${port}`;
+    $("join-address").textContent = address;
+    $("join-address").dataset.copy = address;
+    $("join-address").classList.add("small");
+}
+
+// Only the real values carry data-copy, so a placeholder cannot end up on the
+// clipboard. Silent where clipboard access needs a secure context (plain http).
+$("join").addEventListener("click", (e) => {
+    const value = e.target.closest("strong")?.dataset.copy;
+    if (value) navigator.clipboard?.writeText(value);
+});
 
 /* --- controls --------------------------------------------------------- */
 
@@ -171,6 +211,7 @@ async function loadSettings() {
         if (field.type === "checkbox") field.checked = value;
         else field.value = value;
     }
+    settingsLoaded = true;
 }
 
 $("settings").addEventListener("submit", async (e) => {

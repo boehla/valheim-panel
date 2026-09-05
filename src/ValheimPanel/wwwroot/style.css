@@ -86,6 +86,30 @@ h2 {
 
 .hero-detail { margin: 0; color: var(--muted); }
 
+/* --- join ------------------------------------------------------------- */
+
+.join {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    background: var(--rune);
+    color: var(--fog);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.join span { display: block; font-size: 0.78rem; opacity: 0.7; }
+
+.join strong {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
+    word-break: break-all;
+}
+
+.join .small { font-size: 1rem; letter-spacing: 0; }
+
 /* --- facts ------------------------------------------------------------ */
 
 .facts {

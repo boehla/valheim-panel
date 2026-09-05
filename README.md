@@ -37,6 +37,31 @@ Two systemd units: `valheim` and `valheim-panel`.
 `valheim.service` stops with `SIGINT`, which is the only signal Valheim treats as a
 clean shutdown. On `SIGTERM` the world is not written and the last session is lost.
 
+## Crossplay and the join code
+
+The six-digit join code comes from PlayFab, and the server only gets one when **both**
+settings are on:
+
+Both are on in a fresh install.
+
+- `CROSSPLAY=1` — passes `-crossplay`.
+- `PUBLIC=1` — Valheim registers the PlayFab session only for a public server, and it
+  is that registration which hands out the code. With `PUBLIC=0` the log shows
+  `New session server "…" that has join code ,` with nothing in it, and the server
+  retries `create and join network` every 30 seconds forever. A public server needs a
+  password, which the panel already enforces.
+
+The container also needs `libpulse-dev`. PlayFab Party loads the unversioned
+`libpulse.so`, and Debian ships that symlink only in the `-dev` package; without it the
+server logs `DLL Not Found` once at start and crossplay never comes up. The install
+script installs it — containers created before it did need `apt install -y libpulse-dev`
+and a restart.
+
+Once both are set, the log reads `Session "…" registered with join code 123456`, and the
+panel shows the code under the status header. Without crossplay, players use
+**Join IP** with the server's address and port 2456 (UDP 2456–2458 forwarded if they are
+outside the LAN).
+
 ## Releasing
 
 `fetch_and_deploy_gh_release` and the panel's self-update both read GitHub releases,

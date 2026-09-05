@@ -9,6 +9,7 @@ public class ServerStatus {
     public string BuildId { get; set; } = "";
     public string GameVersion { get; set; } = "";
     public int PlayersOnline { get; set; }
+    public string JoinCode { get; set; } = "";
     public string WorldName { get; set; } = "";
     public long WorldSizeBytes { get; set; }
     public DateTime? WorldSavedAt { get; set; }
@@ -34,6 +35,11 @@ public static partial class ServerControl {
     [GeneratedRegex(@"Valheim version:\s*(?:[a-z]-)?(\d+(?:\.\d+)+)")]
     private static partial Regex GameVersionRegex();
 
+    // "Session \"Name\" with join code 123456 and IP 1.2.3.4:2456 is active ..."
+    // Only printed with -crossplay; without it there is no code to show.
+    [GeneratedRegex(@"join code\s*(\d{4,})", RegexOptions.IgnoreCase)]
+    private static partial Regex JoinCodeRegex();
+
     public static async Task<ServerStatus> GetStatusAsync() {
         ServerSettings settings = ServerSettings.Load();
         ServerStatus status = new ServerStatus {
@@ -57,7 +63,10 @@ public static partial class ServerControl {
             status.WorldSavedAt = info.LastWriteTime;
         }
 
-        if(status.Running) status.PlayersOnline = await countPlayersAsync();
+        if(status.Running) {
+            status.PlayersOnline = await countPlayersAsync();
+            if(settings.Crossplay) status.JoinCode = await readJoinCodeAsync(startedRaw);
+        }
         return status;
     }
 
@@ -133,6 +142,29 @@ public static partial class ServerControl {
         gameVersion = match.Groups[1].Value;
         gameVersionRun = runKey;
         return gameVersion;
+    }
+
+    static string joinCode = "";
+    static string joinCodeRun = "";
+
+    /// <summary>
+    /// The crossplay join code is handed out by PlayFab a few seconds after start and
+    /// only ever appears in the log. Cached against the unit's start timestamp: a new
+    /// code is issued per session, so it can only change across a restart.
+    /// </summary>
+    static async Task<string> readJoinCodeAsync(string runKey) {
+        if(runKey.Length > 0 && runKey == joinCodeRun && joinCode.Length > 0) return joinCode;
+
+        ShellResult res = await Shell.RunAsync("/usr/bin/journalctl",
+            ["-u", Unit, "--no-pager", "-o", "cat", "--grep", "join code", "-n", "1"]);
+        if(!res.Ok) return "";
+
+        Match match = JoinCodeRegex().Match(res.StdOut);
+        if(!match.Success) return "";
+
+        joinCode = match.Groups[1].Value;
+        joinCodeRun = runKey;
+        return joinCode;
     }
 
     static string readBuildId() {

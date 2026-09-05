@@ -16,10 +16,14 @@ update_os
 msg_info "Installing Dependencies"
 dpkg --add-architecture i386
 $STD apt update
+# libpulse-dev, not libpulse0: PlayFab Party dlopens the unversioned libpulse.so,
+# and Debian ships that symlink only in the -dev package. Without it Party fails to
+# initialise with "DLL Not Found" and a crossplay server never gets a join code.
 $STD apt install -y \
   ca-certificates \
   lib32gcc-s1 \
-  lib32stdc++6
+  lib32stdc++6 \
+  libpulse-dev
 msg_ok "Installed Dependencies"
 
 msg_info "Installing SteamCMD"
@@ -50,7 +54,9 @@ SERVER_NAME=Valheim
 SERVER_PORT=2456
 WORLD_NAME=Dedicated
 SERVER_PASSWORD=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | cut -c1-10)
-PUBLIC=0
+# PUBLIC=1 is what makes CROSSPLAY=1 useful: Valheim registers the PlayFab session
+# only for a public server, and that registration is what issues the join code.
+PUBLIC=1
 CROSSPLAY=1
 SAVE_DIR=/opt/valheim/data
 BACKUPS=4
