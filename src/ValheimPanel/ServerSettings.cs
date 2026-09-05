@@ -12,6 +12,7 @@ public class ServerSettings {
     public int BackupShort { get; set; } = 7200;
     public int BackupLong { get; set; } = 43200;
     public bool AutoUpdateServer { get; set; } = true;
+    public int AutoBackupHours { get; set; } = 6;
 
     static readonly string configFile = "/etc/valheim/server.env";
 
@@ -39,6 +40,7 @@ public class ServerSettings {
         settings.Public = parseBool(raw.GetValueOrDefault("PUBLIC"), settings.Public);
         settings.Crossplay = parseBool(raw.GetValueOrDefault("CROSSPLAY"), settings.Crossplay);
         settings.AutoUpdateServer = parseBool(raw.GetValueOrDefault("AUTO_UPDATE"), settings.AutoUpdateServer);
+        settings.AutoBackupHours = parseInt(raw.GetValueOrDefault("AUTO_BACKUP_HOURS"), settings.AutoBackupHours);
         return settings;
     }
 
@@ -57,6 +59,7 @@ public class ServerSettings {
             BACKUP_SHORT={BackupShort}
             BACKUP_LONG={BackupLong}
             AUTO_UPDATE={(AutoUpdateServer ? 1 : 0)}
+            AUTO_BACKUP_HOURS={AutoBackupHours}
 
             """;
         File.WriteAllText(configFile, content);
@@ -74,6 +77,7 @@ public class ServerSettings {
         if(string.IsNullOrWhiteSpace(ServerName)) errors.Add("Servername darf nicht leer sein.");
         if(string.IsNullOrWhiteSpace(WorldName)) errors.Add("Weltname darf nicht leer sein.");
         if(Port < 1024 || Port > 65530) errors.Add("Port muss zwischen 1024 und 65530 liegen.");
+        if(AutoBackupHours < 0 || AutoBackupHours > 168) errors.Add("Automatische Sicherung muss zwischen 0 und 168 Stunden liegen (0 = aus).");
 
         if(Password.Length > 0) {
             if(Password.Length < 5) errors.Add("Passwort muss mindestens 5 Zeichen haben.");

@@ -188,9 +188,9 @@ form label {
     color: var(--muted);
 }
 
-form input[type="text"],
-form input[type="number"],
-form input[type="password"],
+/* Not by type: an <input> without an explicit type is a text field, and listing the
+   types left exactly those rendering narrow next to the ones that matched. */
+form input:not([type="checkbox"]),
 .gate-box input {
     display: block;
     width: 100%;
@@ -237,3 +237,54 @@ pre {
     .hero-state { transition: color 200ms ease; }
     .hero { transition: border-color 200ms ease; }
 }
+
+/* --- backups ---------------------------------------------------------- */
+
+.backup-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+}
+
+.backup-actions .check { margin: 0; }
+
+.backups {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.backups td {
+    border-bottom: 1px solid var(--edge);
+    padding: 0.6rem 0.5rem 0.6rem 0;
+    vertical-align: middle;
+}
+
+.backups td.muted { color: var(--muted); border-bottom: none; }
+.backups tr td:last-child { padding-right: 0; }
+
+.badge {
+    display: inline-block;
+    background: var(--pine);
+    color: var(--fog);
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.4rem;
+    vertical-align: 0.1em;
+}
+
+.row-actions {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+
+.row-actions button { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+
+/* --- danger zone ------------------------------------------------------ */
+
+.danger-zone { border-top: 3px solid var(--ember); }
+.danger-zone h2 { color: var(--ember); }
+.danger-zone button { width: 100%; }

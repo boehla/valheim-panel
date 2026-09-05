@@ -29,6 +29,7 @@ When it finishes, open `http://<container-ip>:8099`. The access token is in
 |---|---|
 | `/opt/valheim/server` | Game server files (SteamCMD app 896660) |
 | `/opt/valheim/data` | Worlds and the server's own backups |
+| `/opt/valheim/backups` | The panel's world archives |
 | `/etc/valheim/server.env` | Server settings, written by the panel |
 | `/opt/valheim-panel` | Panel binary, `.env`, `VERSION` |
 
@@ -36,6 +37,40 @@ Two systemd units: `valheim` and `valheim-panel`.
 
 `valheim.service` stops with `SIGINT`, which is the only signal Valheim treats as a
 clean shutdown. On `SIGTERM` the world is not written and the last session is lost.
+
+## Backups and starting a fresh world
+
+Valheim rotates its own backups inside `/opt/valheim/data` on the `-backupshort` and
+`-backuplong` intervals. The panel keeps a separate set in `/opt/valheim/backups`: one
+`tar.gz` per world holding the `.db`, `.fwl` and the `.old` generation of each.
+
+The file name carries everything the panel knows about an archive —
+`20260909-181500_perma_Kanisfjall.tar.gz` is timestamp, kind, world — so there is no
+index that can drift out of sync with the directory. `perma` archives are never pruned;
+`temp` ones are kept ten deep.
+
+`AUTO_BACKUP_HOURS` (6 by default, 0 turns it off) adds a cyclic one on top. Whether a
+backup is due is derived from the newest `temp` archive on disk rather than from a timer,
+so restarting the panel — or letting it update itself — does not reset the cycle and
+there is no schedule to persist. A cycle is skipped when the world has not been written
+since the last archive, so an idle server does not push its own history out of the ten
+kept slots.
+
+Restoring stops the server, archives the world it is about to overwrite, unpacks, and
+starts the server again. If the archive holds a different world than the one configured,
+the job log says so — the files land correctly, but the server only loads them once the
+world name in the settings matches.
+
+**Welt neu generieren** deletes the current world so Valheim builds a new one on the next
+start. A permanent backup is made first, and its success gates the deletion: if the
+archive cannot be written, nothing is removed. Confirmation is the world name typed in
+full, and the API checks it too — a browser dialog is not a safeguard an endpoint has.
+The form also takes a new world name, which is the gentler route to a fresh start: the
+old world keeps its files and can be switched back to at any time.
+
+For Valheim 1.0 this is the button that matters. The Deep North only generates in terrain
+that has never been explored, so a world carried over from 0.2x will not have it. Try a
+backup and a restore once before the day you need them.
 
 ## Crossplay and the join code
 

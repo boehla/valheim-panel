@@ -5,6 +5,7 @@ using ValheimPanel;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://0.0.0.0:{Environment.GetEnvironmentVariable("PANEL_PORT") ?? "8099"}");
 builder.Logging.AddSimpleConsole(o => o.SingleLine = true);
+builder.Services.AddHostedService<AutoBackupService>();
 
 WebApplication app = builder.Build();
 
@@ -69,6 +70,41 @@ app.MapPost("/api/server/update", () => {
 
 app.MapGet("/api/job", () => Results.Ok(JobRunner.Snapshot()));
 
+app.MapGet("/api/backups", () => Results.Ok(Backups.List()));
+
+app.MapPost("/api/backups", (BackupRequest req) => {
+    bool started = JobRunner.TryStart("Sicherung", log => Backups.CreateAsync(log, req.Permanent));
+    return started ? Results.Accepted() : Results.Conflict(new { error = "Es läuft bereits ein Job." });
+});
+
+app.MapPost("/api/backups/restore", (RestoreRequest req) => {
+    bool started = JobRunner.TryStart("Wiederherstellung", log => Backups.RestoreAsync(log, req.FileName));
+    return started ? Results.Accepted() : Results.Conflict(new { error = "Es läuft bereits ein Job." });
+});
+
+app.MapDelete("/api/backups/{fileName}", (string fileName) => {
+    if(JobRunner.IsBusy) return Results.Conflict(new { error = "Es läuft gerade ein Job." });
+    try {
+        Backups.Delete(fileName);
+        return Results.Ok(new { ok = true });
+    } catch(Exception ex) {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+// The typed world name is checked here, not only in the browser: this is the one
+// endpoint that destroys data, and a confirm dialog is not a safeguard an API has.
+app.MapPost("/api/world/regenerate", (RegenerateRequest req) => {
+    ServerSettings settings = ServerSettings.Load();
+    if(req.Confirm != settings.WorldName) {
+        return Results.BadRequest(new { error = $"Zur Bestätigung muss der Weltname \"{settings.WorldName}\" exakt eingegeben werden." });
+    }
+
+    string newName = (req.NewWorldName ?? "").Trim();
+    bool started = JobRunner.TryStart("Welt neu generieren", log => Backups.RegenerateAsync(log, newName));
+    return started ? Results.Accepted() : Results.Conflict(new { error = "Es läuft bereits ein Job." });
+});
+
 app.MapGet("/api/settings", () => Results.Ok(ServerSettings.Load()));
 
 app.MapPut("/api/settings", (ServerSettings settings) => {
@@ -95,3 +131,6 @@ app.MapPost("/api/panel/update", () => {
 app.Run();
 
 record LoginRequest(string Token);
+record BackupRequest(bool Permanent);
+record RestoreRequest(string FileName);
+record RegenerateRequest(string Confirm, string? NewWorldName);

@@ -91,8 +91,39 @@
       <p class="hint">Der Beitritts-Code entsteht erst, wenn Valheim die Session öffentlich
       registriert — Crossplay allein reicht nicht, beide Haken müssen gesetzt sein.</p>
       <label class="check"><input name="autoUpdateServer" type="checkbox"> Beim Start automatisch auf neue Version prüfen</label>
+      <label>Automatische Sicherung alle … Stunden (0 = aus)
+        <input name="autoBackupHours" type="number" min="0" max="168"></label>
       <button type="submit">Einstellungen speichern</button>
       <p id="settings-msg" hidden></p>
+    </form>
+  </section>
+
+  <section class="block">
+    <h2>Sicherungen</h2>
+    <p class="hint">Eigene Sicherungen der Welt, unabhängig von denen, die Valheim selbst
+    rotiert. Dauerhafte werden nie automatisch gelöscht, die übrigen nur, solange mehr
+    als zehn davon liegen. <span id="auto-backup-hint"></span></p>
+    <div class="backup-actions">
+      <button id="btn-backup">Sicherung erstellen</button>
+      <label class="check"><input id="backup-perma" type="checkbox"> dauerhaft aufbewahren</label>
+    </div>
+    <table class="backups">
+      <tbody id="backup-list"><tr><td>–</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="block danger-zone">
+    <h2>Welt neu generieren</h2>
+    <p class="hint">Löscht die aktuelle Welt, damit Valheim beim nächsten Start eine frische
+    erzeugt. Vorher wird automatisch eine <strong>dauerhafte</strong> Sicherung angelegt —
+    ohne die passiert nichts. Für Valheim 1.0 nötig, weil der Hohe Norden nur in
+    unerforschtem Gelände entsteht.</p>
+    <form id="regenerate">
+      <label>Neuer Weltname <input name="newWorldName" placeholder="leer lassen = Name behalten"></label>
+      <label>Zur Bestätigung den aktuellen Weltnamen eingeben
+        <input name="confirm" autocomplete="off" required></label>
+      <button type="submit" class="danger">Welt unwiderruflich neu generieren</button>
+      <p id="regenerate-msg" hidden></p>
     </form>
   </section>
 

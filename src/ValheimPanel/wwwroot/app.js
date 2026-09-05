@@ -42,6 +42,7 @@ function unlock() {
     $("gate").hidden = true;
     $("app").hidden = false;
     loadSettings();
+    loadBackups();
     checkPanelUpdate();
     refresh();
     setInterval(refresh, 5000);
@@ -155,20 +156,131 @@ $("btn-update-server").addEventListener("click", async () => {
 
 /* --- jobs ------------------------------------------------------------- */
 
+// Jobs that change the backup list; the list is reloaded once when one of them ends,
+// keyed on the finish timestamp so the poll does not refetch every five seconds.
+const backupJobs = ["Sicherung", "Automatische Sicherung", "Wiederherstellung", "Welt neu generieren"];
+let lastFinishedJob = "";
+
 async function pollJob() {
     try {
         const job = await (await api("/api/job")).json();
         if (!job.name) return;
 
         $("job-block").hidden = false;
-        $("job-title").textContent = job.running ? `${job.name} läuft …` : `${job.name} — fertig`;
+        $("job-title").textContent = job.running
+            ? `${job.name} läuft …`
+            : `${job.name} — ${job.failed ? "fehlgeschlagen" : "fertig"}`;
         $("job-log").textContent = job.log.join("\n");
         $("job-log").scrollTop = $("job-log").scrollHeight;
 
         $("btn-update-server").disabled = job.running;
         $("btn-update-panel").disabled = job.running;
+        $("btn-backup").disabled = job.running;
+
+        const key = `${job.name}@${job.finishedAt}`;
+        if (!job.running && backupJobs.includes(job.name) && key !== lastFinishedJob) {
+            lastFinishedJob = key;
+            loadBackups();
+            loadSettings();
+        }
     } catch { }
 }
+
+/* --- backups ---------------------------------------------------------- */
+
+async function loadBackups() {
+    let backups;
+    try {
+        backups = await (await api("/api/backups")).json();
+    } catch { return; }
+
+    const list = $("backup-list");
+    if (!backups.length) {
+        list.innerHTML = `<tr><td class="muted">Noch keine Sicherung angelegt.</td></tr>`;
+        return;
+    }
+
+    list.replaceChildren(...backups.map(b => {
+        const row = document.createElement("tr");
+
+        const when = document.createElement("td");
+        when.textContent = new Date(b.createdAt).toLocaleString("de-AT");
+        if (b.permanent) {
+            const badge = document.createElement("span");
+            badge.className = "badge";
+            badge.textContent = "dauerhaft";
+            when.append(" ", badge);
+        }
+
+        const world = document.createElement("td");
+        world.textContent = b.worldName;
+
+        const size = document.createElement("td");
+        size.textContent = `${(b.sizeBytes / 1048576).toFixed(1)} MB`;
+
+        const actions = document.createElement("td");
+        actions.className = "row-actions";
+
+        const restore = document.createElement("button");
+        restore.textContent = "Wiederherstellen";
+        restore.onclick = async () => {
+            if (!confirm(`"${b.worldName}" vom ${new Date(b.createdAt).toLocaleString("de-AT")} wiederherstellen?\n\nDer Server wird gestoppt. Der aktuelle Stand wird vorher gesichert.`)) return;
+            await api("/api/backups/restore", { method: "POST", body: JSON.stringify({ fileName: b.fileName }) });
+            pollJob();
+        };
+
+        const remove = document.createElement("button");
+        remove.className = "danger";
+        remove.textContent = "Löschen";
+        remove.onclick = async () => {
+            if (!confirm(`Sicherung vom ${new Date(b.createdAt).toLocaleString("de-AT")} endgültig löschen?`)) return;
+            const res = await api(`/api/backups/${encodeURIComponent(b.fileName)}`, { method: "DELETE" });
+            if (!res.ok) alert((await res.json()).error);
+            loadBackups();
+        };
+
+        actions.append(restore, remove);
+        row.append(when, world, size, actions);
+        return row;
+    }));
+}
+
+$("btn-backup").addEventListener("click", async () => {
+    await api("/api/backups", {
+        method: "POST",
+        body: JSON.stringify({ permanent: $("backup-perma").checked })
+    });
+    pollJob();
+});
+
+/* --- world regeneration ----------------------------------------------- */
+
+$("regenerate").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const msg = $("regenerate-msg");
+
+    if (!confirm("Die aktuelle Welt wird gelöscht und beim nächsten Start neu erzeugt.\n\nEine dauerhafte Sicherung wird vorher angelegt, aber der Spielfortschritt in dieser Welt ist danach nur noch über eine Wiederherstellung erreichbar.\n\nWirklich fortfahren?")) return;
+
+    const res = await api("/api/world/regenerate", {
+        method: "POST",
+        body: JSON.stringify({
+            confirm: form.elements.confirm.value,
+            newWorldName: form.elements.newWorldName.value
+        })
+    });
+
+    if (res.ok || res.status === 202) {
+        msg.hidden = true;
+        form.reset();
+        pollJob();
+        return;
+    }
+
+    msg.hidden = false;
+    msg.className = "error";
+    msg.textContent = (await res.json()).error;
+});
 
 /* --- panel self-update ------------------------------------------------ */
 
@@ -212,6 +324,10 @@ async function loadSettings() {
         else field.value = value;
     }
     settingsLoaded = true;
+
+    $("auto-backup-hint").textContent = settings.autoBackupHours > 0
+        ? `Automatisch alle ${settings.autoBackupHours} Stunden, sofern die Welt seit der letzten Sicherung gespeichert wurde.`
+        : "Automatische Sicherung ist aus — einzustellen weiter oben.";
 }
 
 $("settings").addEventListener("submit", async (e) => {
