@@ -112,6 +112,55 @@
     </table>
   </section>
 
+  <section class="block">
+    <h2>Mods</h2>
+    <p class="hint">Mods kommen von <a href="https://thunderstore.io/c/valheim/" target="_blank" rel="noreferrer">Thunderstore</a>
+    und laufen über BepInEx. Abhängigkeiten werden mitinstalliert. Jeder Mitspieler
+    braucht dieselben Mods — dafür gibt es unten das Client-Paket.</p>
+
+    <div class="update-row">
+      <div>
+        <strong>BepInEx</strong>
+        <p id="loader-state">–</p>
+      </div>
+      <div class="loader-actions">
+        <label class="check" id="loader-toggle" hidden><input id="loader-enabled" type="checkbox"> aktiv</label>
+        <button id="btn-loader-install">Installieren</button>
+      </div>
+    </div>
+
+    <p id="mods-warning" class="warn" hidden></p>
+
+    <div id="mods-body" hidden>
+      <form id="mod-search">
+        <label>Im Thunderstore suchen
+          <input name="q" type="search" autocomplete="off" placeholder="z. B. EpicLoot, Jotunn, Valheim+"></label>
+      </form>
+      <div id="mod-results"></div>
+
+      <h3 class="sub">Installiert</h3>
+      <div id="mod-list"><p class="hint">–</p></div>
+
+      <h3 class="sub">Paket für die Mitspieler</h3>
+      <p class="hint">Ein Zip mit BepInEx und allen aktiven Mods, die als „für Clients“
+      markiert sind. Die Spieler entpacken es in ihren Valheim-Ordner. Nach jeder
+      Änderung neu bauen, sonst passen die Mod-Listen nicht zusammen und der Server
+      lehnt die Verbindung ab.</p>
+      <div class="mod-tools">
+        <button id="btn-client-pack">Client-Paket bauen</button>
+        <a id="client-pack-link" class="download" href="/api/mods/client-pack" hidden>Herunterladen</a>
+        <span id="client-pack-age" class="hint"></span>
+      </div>
+
+      <h3 class="sub">Katalog</h3>
+      <div class="mod-tools">
+        <button id="btn-mods-update">Alle Mods aktualisieren</button>
+        <button id="btn-catalog">Katalog neu laden</button>
+        <span id="catalog-age" class="hint"></span>
+      </div>
+    </div>
+  </section>
+
   <section class="block danger-zone">
     <h2>Welt neu generieren</h2>
     <p class="hint">Löscht die aktuelle Welt, damit Valheim beim nächsten Start eine frische

@@ -115,6 +115,89 @@ app.MapPut("/api/settings", (ServerSettings settings) => {
     return Results.Ok(new { ok = true, restartRequired = true });
 });
 
+/* --- mods ------------------------------------------------------------- */
+
+app.MapGet("/api/mods", async () => Results.Ok(await Mods.StateAsync()));
+
+// The first search pays for the catalogue download, which is why this is the one mods
+// endpoint allowed to go to the network on a plain GET.
+app.MapGet("/api/mods/search", async (string? q, int? limit) => {
+    try {
+        return Results.Ok(await Thunderstore.SearchAsync(q ?? "", Math.Clamp(limit ?? 30, 1, 100)));
+    } catch(Exception ex) {
+        return Results.Problem($"Thunderstore nicht erreichbar: {ex.Message}");
+    }
+});
+
+app.MapPost("/api/mods/catalog/refresh", () => {
+    bool started = JobRunner.TryStart("Mod-Katalog", async log => await Thunderstore.CatalogAsync(log, force: true));
+    return started ? Results.Accepted() : Results.Conflict(new { error = "Es läuft bereits ein Job." });
+});
+
+app.MapPost("/api/mods/install", (ModRequest req) => {
+    bool started = JobRunner.TryStart("Mod installieren", log => Mods.InstallAsync(log, req.FullName));
+    return started ? Results.Accepted() : Results.Conflict(new { error = "Es läuft bereits ein Job." });
+});
+
+app.MapPost("/api/mods/update", () => {
+    bool started = JobRunner.TryStart("Mods aktualisieren", log => Mods.UpdateAllAsync(log));
+    return started ? Results.Accepted() : Results.Conflict(new { error = "Es läuft bereits ein Job." });
+});
+
+app.MapDelete("/api/mods/{fullName}", (string fullName) => {
+    if(JobRunner.IsBusy) return Results.Conflict(new { error = "Es läuft gerade ein Job." });
+    try {
+        Mods.Uninstall(fullName);
+        return Results.Ok(new { ok = true });
+    } catch(Exception ex) {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/mods/{fullName}/enabled", (string fullName, ToggleRequest req) => {
+    try {
+        Mods.SetEnabled(fullName, req.Value);
+        return Results.Ok(new { ok = true });
+    } catch(Exception ex) {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/mods/{fullName}/client", (string fullName, ToggleRequest req) => {
+    try {
+        Mods.SetClient(fullName, req.Value);
+        return Results.Ok(new { ok = true });
+    } catch(Exception ex) {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/mods/loader/install", () => {
+    bool started = JobRunner.TryStart("BepInEx installieren", log => Mods.InstallLoaderAsync(log));
+    return started ? Results.Accepted() : Results.Conflict(new { error = "Es läuft bereits ein Job." });
+});
+
+app.MapPost("/api/mods/loader/enabled", async (ToggleRequest req) => {
+    try {
+        await Mods.SetLoaderEnabledAsync(_ => { }, req.Value);
+        return Results.Ok(new { ok = true });
+    } catch(Exception ex) {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/mods/client-pack", () => {
+    bool started = JobRunner.TryStart("Client-Paket", log => Mods.BuildClientPackAsync(log));
+    return started ? Results.Accepted() : Results.Conflict(new { error = "Es läuft bereits ein Job." });
+});
+
+// Behind the token like everything else under /api, so the link works from the browser
+// only because the login cookie is already set.
+app.MapGet("/api/mods/client-pack", () => {
+    if(!File.Exists(Mods.ClientPackFile)) return Results.NotFound(new { error = "Noch kein Client-Paket erstellt." });
+    return Results.File(Mods.ClientPackFile, "application/zip", "valheim-mods.zip");
+});
+
 app.MapGet("/api/panel/update", async () => {
     try {
         return Results.Ok(await SelfUpdate.CheckAsync());
@@ -134,3 +217,5 @@ record LoginRequest(string Token);
 record BackupRequest(bool Permanent);
 record RestoreRequest(string FileName);
 record RegenerateRequest(string Confirm, string? NewWorldName);
+record ModRequest(string FullName);
+record ToggleRequest(bool Value);

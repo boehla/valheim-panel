@@ -27,7 +27,7 @@ $STD apt install -y \
 msg_ok "Installed Dependencies"
 
 msg_info "Installing SteamCMD"
-mkdir -p /opt/valheim/steamcmd /opt/valheim/server /opt/valheim/data
+mkdir -p /opt/valheim/steamcmd /opt/valheim/server /opt/valheim/data /opt/valheim/mods
 curl -fsSL https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz | tar xz -C /opt/valheim/steamcmd
 msg_ok "Installed SteamCMD"
 
@@ -88,6 +88,9 @@ WorkingDirectory=/opt/valheim/server
 EnvironmentFile=/etc/valheim/server.env
 Environment=SteamAppId=892970
 Environment=LD_LIBRARY_PATH=/opt/valheim/server/linux64
+# The panel switches mods on by dropping bepinex.conf into valheim.service.d, which
+# overrides LD_LIBRARY_PATH and adds the Doorstop variables. Keep that out of this
+# file: it is rewritten on every reinstall and would take the mod loader with it.
 ExecStartPre=/bin/sh -c '[ "\$AUTO_UPDATE" = "1" ] && /opt/valheim/steamcmd/steamcmd.sh +force_install_dir /opt/valheim/server +login anonymous +app_update 896660 +quit || true'
 ExecStart=/bin/sh -c 'exec /opt/valheim/server/valheim_server.x86_64 -nographics -batchmode -name "\$SERVER_NAME" -port "\$SERVER_PORT" -world "\$WORLD_NAME" -savedir "\$SAVE_DIR" -public "\$PUBLIC" -backups "\$BACKUPS" -backupshort "\$BACKUP_SHORT" -backuplong "\$BACKUP_LONG" \$([ -n "\$SERVER_PASSWORD" ] && echo -password "\$SERVER_PASSWORD") \$([ "\$CROSSPLAY" = "1" ] && echo -crossplay)'
 KillSignal=SIGINT

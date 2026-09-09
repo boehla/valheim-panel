@@ -30,6 +30,8 @@ When it finishes, open `http://<container-ip>:8099`. The access token is in
 | `/opt/valheim/server` | Game server files (SteamCMD app 896660) |
 | `/opt/valheim/data` | Worlds and the server's own backups |
 | `/opt/valheim/backups` | The panel's world archives |
+| `/opt/valheim/server/BepInEx` | Mod loader and one directory per installed mod |
+| `/opt/valheim/mods` | Thunderstore catalogue, package cache, client pack |
 | `/etc/valheim/server.env` | Server settings, written by the panel |
 | `/opt/valheim-panel` | Panel binary, `.env`, `VERSION` |
 
@@ -71,6 +73,54 @@ old world keeps its files and can be switched back to at any time.
 For Valheim 1.0 this is the button that matters. The Deep North only generates in terrain
 that has never been explored, so a world carried over from 0.2x will not have it. Try a
 backup and a restore once before the day you need them.
+
+## Mods
+
+Mods come from [Thunderstore](https://thunderstore.io/c/valheim/) and run under BepInEx.
+The panel searches the catalogue, installs a package with its dependencies, and builds
+the zip the players need — nothing has to be done over SSH.
+
+Thunderstore has no working search endpoint: `/api/experimental/package/` takes a `q`
+parameter and ignores it, and the frontend API is behind a bot check. So the panel takes
+the full community listing once — 162 MB of JSON, 12 MB gzipped — keeps only the newest
+version of each of the ~10 500 packages, and searches that locally. The catalogue is
+streamed element by element rather than parsed as one document, which is what keeps it
+off the heap in a container sized for the game server. It is cached in
+`/opt/valheim/mods/catalog.json` and refetched when it is older than twelve hours.
+
+**BepInEx is not installed as a mod.** It unpacks into the server root, and the panel
+switches it on by writing `/etc/systemd/system/valheim.service.d/bepinex.conf` with the
+Doorstop variables — the same ones the pack's own `start_server_bepinex.sh` exports, but
+absolute, because systemd does not run the unit through that script. The drop-in is
+deliberately not part of `valheim.service`: that file is rewritten on every reinstall and
+would take the mod loader with it. Deleting the drop-in gives back a vanilla server with
+every mod still on disk.
+
+Each mod lives in `BepInEx/plugins/<Owner-Name>/` with a `valheim-panel.json` next to its
+files holding the version and the flags. That directory *is* the state — there is no index
+that can drift from what BepInEx actually loads, and deleting the directory really does
+uninstall the mod. Disabling moves it to `BepInEx/plugins-disabled/`, which BepInEx does
+not scan. Configs under `BepInEx/config/` are never overwritten by an install and never
+removed by an uninstall.
+
+Turn **`AUTO_UPDATE` off on a modded server.** A new Valheim build invalidates every
+assembly the mods were compiled against, so an unattended SteamCMD update on the next
+restart is an unattended way to break the server. The panel says so when both are on.
+
+### The client pack
+
+Valheim refuses a connection when the mod sets do not line up, so every player needs the
+same files. **Client-Paket bauen** writes a zip holding the same BepInEx build the server
+runs plus every enabled mod marked *für Clients*, laid out so it unpacks straight into the
+Valheim game folder next to `valheim.exe`. A `LIESMICH.txt` in the archive says as much.
+
+The *für Clients* box starts off ticked unless Thunderstore tags the package server-side
+and not client-side. Untagged packages count as needed on both sides: a mod missing on the
+client is a refused connection, a superfluous one is harmless. Building the pack warns when
+a mod is in it but one of its libraries is not.
+
+Rebuild the pack after every change, and hand out the new one — the point of failure here
+is a player still running last week's zip.
 
 ## Crossplay and the join code
 
@@ -143,6 +193,9 @@ admin interface:
 - If you want remote access, put it behind a reverse proxy with its own auth.
 - The token in `/opt/valheim-panel/.env` is the only thing between a visitor and a
   shell-equivalent surface. Rotate it if it leaks, and restart the unit.
+- Installing a mod runs somebody else's assembly inside the game server. The panel
+  rejects archive paths that would climb out of the target directory, but it cannot
+  vouch for the code itself — install from authors you have reason to trust.
 
 ## Valheim 1.0
 
@@ -152,8 +205,9 @@ for a server:
 - The Deep North only generates in terrain that has never been explored. Iron Gate
   recommends a fresh world for the full experience. Decide before launch day —
   switching later costs the group its progress.
-- Iron Gate does not guarantee mods will load on 1.0. This setup installs no mod
-  loader, which is deliberate.
+- Iron Gate does not guarantee mods will load on 1.0. The panel installs BepInEx on
+  request, but whether a given mod survives the update is up to its author — keep
+  `AUTO_UPDATE` off while modded so the jump happens when you choose it.
 
 `AUTO_UPDATE=1` (the default) makes the server check SteamCMD on every start, so the
 1.0 build arrives with the next restart on its own.
