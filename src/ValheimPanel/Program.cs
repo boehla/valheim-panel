@@ -36,7 +36,16 @@ app.Use(async (ctx, next) => {
 // The UI lives inside the binary, so it must not be resolved from the working directory.
 IFileProvider webAssets = new ManifestEmbeddedFileProvider(Assembly.GetExecutingAssembly(), "wwwroot");
 app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = webAssets });
-app.UseStaticFiles(new StaticFileOptions { FileProvider = webAssets });
+
+// Without an explicit Cache-Control a browser is allowed to guess how long the file stays
+// fresh, and it guesses from the age of Last-Modified -- so the longer a version was in
+// service, the longer its JavaScript survives the update that replaced it. A panel that
+// updates itself and then goes on running last week's UI against this week's API is worse
+// than one that revalidates three small files; the ETag makes that a 304 anyway.
+app.UseStaticFiles(new StaticFileOptions {
+    FileProvider = webAssets,
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache"
+});
 
 app.MapPost("/api/login", (LoginRequest req, HttpContext ctx) => {
     if(panelToken.Length == 0 || req.Token != panelToken) return Results.Unauthorized();

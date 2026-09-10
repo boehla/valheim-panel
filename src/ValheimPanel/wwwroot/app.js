@@ -153,10 +153,9 @@ control("btn-start", "start");
 control("btn-restart", "restart", "Server neu starten? Spieler fliegen raus, die Welt wird vorher gespeichert.");
 control("btn-stop", "stop", "Server stoppen?");
 
-$("btn-update-server").addEventListener("click", async () => {
+$("btn-update-server").addEventListener("click", () => {
     if (!confirm("Server stoppen und über SteamCMD aktualisieren?")) return;
-    await api("/api/server/update", { method: "POST" });
-    pollJob();
+    startJob("/api/server/update");
 });
 
 /* --- jobs ------------------------------------------------------------- */
@@ -259,12 +258,8 @@ async function loadBackups() {
     }));
 }
 
-$("btn-backup").addEventListener("click", async () => {
-    await api("/api/backups", {
-        method: "POST",
-        body: JSON.stringify({ permanent: $("backup-perma").checked })
-    });
-    pollJob();
+$("btn-backup").addEventListener("click", () => {
+    startJob("/api/backups", { permanent: $("backup-perma").checked });
 });
 
 /* --- world regeneration ----------------------------------------------- */
@@ -547,12 +542,17 @@ function renderResults() {
 // swallowing that is what makes a button look dead. Accepted (202) counts as ok.
 async function startJob(path, body) {
     const res = await api(path, { method: "POST", body: body && JSON.stringify(body) });
-    if (res.ok) {
-        pollJob();
-        return true;
+    if (!res.ok) {
+        alert((await res.json().catch(() => ({}))).error || `Fehlgeschlagen (HTTP ${res.status}).`);
+        return false;
     }
-    alert((await res.json().catch(() => ({}))).error || `Fehlgeschlagen (HTTP ${res.status}).`);
-    return false;
+
+    // The job block sits above the settings and the backups, so a button pressed down in the
+    // mods section reports into a part of the page nobody is looking at -- which is
+    // indistinguishable from a button that does nothing at all.
+    await pollJob();
+    $("job-block").scrollIntoView({ behavior: "smooth", block: "center" });
+    return true;
 }
 
 $("btn-loader-install").addEventListener("click", () => startJob("/api/mods/loader/install"));
