@@ -97,6 +97,30 @@ chmod 600 /opt/valheim-panel/.env
 msg_ok "Configured Valheim"
 
 msg_info "Creating Service"
+# The argument list is built in a real shell script, not in ExecStart. ExecStart is
+# not a shell command line: systemd resolves $... in it by its own rules before
+# /bin/sh ever runs, which silently swallowed the $(...) that appended -password and
+# -crossplay. A public server then started with an empty password and refused to boot
+# ("Error bad password:The password is too short"), and crossplay never turned on.
+cat <<'WRAP' >/opt/valheim/start-server.sh
+#!/bin/sh
+# Written by the valheim-panel installer. Every value comes from
+# /etc/valheim/server.env via the unit's EnvironmentFile.
+set -- -nographics -batchmode \
+  -name "$SERVER_NAME" \
+  -port "$SERVER_PORT" \
+  -world "$WORLD_NAME" \
+  -savedir "$SAVE_DIR" \
+  -public "$PUBLIC" \
+  -backups "$BACKUPS" \
+  -backupshort "$BACKUP_SHORT" \
+  -backuplong "$BACKUP_LONG"
+# No "set -e" and no "[ x ] && set -- ...": a false test would end the script.
+if [ -n "${SERVER_PASSWORD:-}" ]; then set -- "$@" -password "$SERVER_PASSWORD"; fi
+if [ "${CROSSPLAY:-}" = "1" ]; then set -- "$@" -crossplay; fi
+exec /opt/valheim/server/valheim_server.x86_64 "$@"
+WRAP
+chmod 755 /opt/valheim/start-server.sh
 cat <<EOF >/etc/systemd/system/valheim.service
 [Unit]
 Description=Valheim Dedicated Server
@@ -118,7 +142,7 @@ Environment=LD_LIBRARY_PATH=/opt/valheim/server/linux64
 # overrides LD_LIBRARY_PATH and adds the Doorstop variables. Keep that out of this
 # file: it is rewritten on every reinstall and would take the mod loader with it.
 ExecStartPre=/bin/sh -c '[ "\$AUTO_UPDATE" = "1" ] && /opt/valheim/steamcmd/steamcmd.sh +force_install_dir /opt/valheim/server +login anonymous +app_update 896660 +quit || true'
-ExecStart=/bin/sh -c 'exec /opt/valheim/server/valheim_server.x86_64 -nographics -batchmode -name "\$SERVER_NAME" -port "\$SERVER_PORT" -world "\$WORLD_NAME" -savedir "\$SAVE_DIR" -public "\$PUBLIC" -backups "\$BACKUPS" -backupshort "\$BACKUP_SHORT" -backuplong "\$BACKUP_LONG" \$([ -n "\$SERVER_PASSWORD" ] && echo -password "\$SERVER_PASSWORD") \$([ "\$CROSSPLAY" = "1" ] && echo -crossplay)'
+ExecStart=/opt/valheim/start-server.sh
 KillSignal=SIGINT
 TimeoutStopSec=120
 Restart=on-failure
