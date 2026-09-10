@@ -44,12 +44,29 @@ clean shutdown. On `SIGTERM` the world is not written and the last session is lo
 
 Valheim rotates its own backups inside `/opt/valheim/data` on the `-backupshort` and
 `-backuplong` intervals. The panel keeps a separate set in `/opt/valheim/backups`: one
-`tar.gz` per world holding the `.db`, `.fwl` and the `.old` generation of each.
+`tar.gz` per world.
 
-The file name carries everything the panel knows about an archive —
+**Valheim 1.0 changed what a world is.** It used to be four loose files — `.db`, `.fwl`
+and the `.old` generation of each. Since 1.0 it is a directory holding
+`_main.<n>.db2`, `.fwl2`, `.chunks` and `.ok` plus one `.chunk` per zone, where `<n>` is
+the save number and every chunk carries its own counter. Nothing in there has a stable
+name, so the archive is the whole directory. The panel still reads and writes the old
+layout when it finds one, which is what a container that has not taken the 1.0 update has.
+
+That difference matters most on the way back in. Chunks are only rewritten when they
+change, so unpacking an older archive over a live world would leave newer chunks and a
+higher `_main.<n>` in place and the server would go on loading those — a restore that
+reports success and changes nothing. So a restore removes the world directory first.
+Archives written before 1.0 hold loose files that would land *beside* the directory
+instead of replacing it; restoring one onto a 1.0 world is refused rather than guessed at.
+The format is read out of the archive, not out of its name.
+
+The file name carries everything else the panel knows about an archive —
 `20260909-181500_perma_Kanisfjall.tar.gz` is timestamp, kind, world — so there is no
 index that can drift out of sync with the directory. `perma` archives are never pruned;
-`temp` ones are kept ten deep.
+`temp` ones are kept ten deep. The name resolves to a whole second; a second backup of
+the same world and kind within that second moves on to the next free second rather than
+overwriting the first.
 
 `AUTO_BACKUP_HOURS` (6 by default, 0 turns it off) adds a cyclic one on top. Whether a
 backup is due is derived from the newest `temp` archive on disk rather than from a timer,

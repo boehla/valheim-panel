@@ -56,9 +56,18 @@ public static partial class ServerControl {
 
         status.GameVersion = await readGameVersionAsync(startedRaw);
 
-        string worldFile = Path.Combine(settings.SaveDir, "worlds_local", $"{settings.WorldName}.db");
-        if(File.Exists(worldFile)) {
-            FileInfo info = new FileInfo(worldFile);
+        // Since 1.0 a world is a directory of chunk files whose names carry the save number,
+        // so its size is the sum and its save time the newest write. Before 1.0 it was a
+        // single .db, which is still what an un-updated container has.
+        string worldPath = Path.Combine(settings.SaveDir, "worlds_local", settings.WorldName);
+        if(Directory.Exists(worldPath)) {
+            FileInfo[] files = new DirectoryInfo(worldPath).GetFiles();
+            if(files.Length > 0) {
+                status.WorldSizeBytes = files.Sum(f => f.Length);
+                status.WorldSavedAt = files.Max(f => f.LastWriteTime);
+            }
+        } else if(File.Exists($"{worldPath}.db")) {
+            FileInfo info = new FileInfo($"{worldPath}.db");
             status.WorldSizeBytes = info.Length;
             status.WorldSavedAt = info.LastWriteTime;
         }
