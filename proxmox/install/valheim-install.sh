@@ -32,7 +32,28 @@ curl -fsSL https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.g
 msg_ok "Installed SteamCMD"
 
 msg_info "Installing Valheim Dedicated Server (this takes a while)"
-$STD /opt/valheim/steamcmd/steamcmd.sh +force_install_dir /opt/valheim/server +login anonymous +app_update 896660 validate +quit
+# app_update needs an initialised Steam config in $HOME. Where $HOME/Steam does not
+# exist yet the client creates it during this very session, and the app_update queued
+# into the same invocation runs before it is usable: "Missing configuration". A bare
+# +quit run creates the config first. This is not a client self-update -- it happens
+# with an already current steamcmd.
+$STD /opt/valheim/steamcmd/steamcmd.sh +quit
+# 2 GB over Steam's CDN fails often enough to be worth retrying, and app_update
+# resumes a partial download, so a retry costs little. The call has to sit in an if:
+# $STD is core's silent(), which returns the exit code, but a bare failing call
+# trips the ERR trap and takes the whole install down before we can retry.
+steamcmd_ok=""
+for attempt in 1 2 3; do
+  if $STD /opt/valheim/steamcmd/steamcmd.sh +force_install_dir /opt/valheim/server +login anonymous +app_update 896660 validate +quit; then
+    steamcmd_ok=1
+    break
+  fi
+  sleep 10
+done
+if [ -z "$steamcmd_ok" ]; then
+  msg_error "SteamCMD failed to install app 896660 after 3 attempts"
+  exit 1
+fi
 msg_ok "Installed Valheim Dedicated Server"
 
 fetch_and_deploy_gh_release "valheim-panel" "boehla/valheim-panel" "singlefile" "latest" "/opt/valheim-panel" "valheim-panel-linux-x64"

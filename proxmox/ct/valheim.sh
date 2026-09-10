@@ -51,7 +51,22 @@ function update_script() {
   msg_ok "Stopped Valheim Server"
 
   msg_info "Updating Valheim Dedicated Server via SteamCMD"
-  $STD /opt/valheim/steamcmd/steamcmd.sh +force_install_dir /opt/valheim/server +login anonymous +app_update 896660 validate +quit
+  # Same as the install script: app_update fails with "Missing configuration" unless
+  # the Steam config in $HOME already exists, so create it in its own run first.
+  $STD /opt/valheim/steamcmd/steamcmd.sh +quit
+  steamcmd_ok=""
+  for attempt in 1 2 3; do
+    if $STD /opt/valheim/steamcmd/steamcmd.sh +force_install_dir /opt/valheim/server +login anonymous +app_update 896660 validate +quit; then
+      steamcmd_ok=1
+      break
+    fi
+    sleep 10
+  done
+  if [ -z "$steamcmd_ok" ]; then
+    msg_error "SteamCMD failed to update app 896660 after 3 attempts"
+    systemctl start valheim
+    exit 1
+  fi
   msg_ok "Updated Valheim Dedicated Server"
 
   if check_for_gh_release "valheim-panel" "boehla/valheim-panel"; then
