@@ -68,6 +68,75 @@ function update_script() {
     exit 1
   fi
   msg_ok "Updated Valheim Dedicated Server"
+  # The unit and its start wrapper belong to the installer, and until now a fix to
+  # either only ever reached fresh installs -- the update path never rewrote them.
+  # Both are regenerated here on every update so existing containers converge too.
+  # Mods survive: the panel keeps those in valheim.service.d/bepinex.conf, which this
+  # does not touch. The two blocks below are copies of the ones in
+  # install/valheim-install.sh and have to be kept in sync with it.
+  msg_info "Refreshing Service Definition"
+# The argument list is built in a real shell script, not with $(...) inside ExecStart.
+# The mod loader's drop-in preloads libdoorstop_x64.so into the whole unit -- the shell
+# that runs ExecStart included -- and Doorstop hooks dup2, which is exactly what a shell
+# uses to wire a command substitution to its pipe. With it loaded,
+# $([ -n "$SERVER_PASSWORD" ] && echo -password "$SERVER_PASSWORD") returned nothing and
+# the echo output leaked to stdout instead, so -password and -crossplay silently
+# disappeared from the command line. A public server then started with an empty password
+# and Valheim refused it: "Error bad password:The password is too short". Only modded
+# servers were affected -- without the drop-in the substitution worked fine.
+# set -- uses builtins only, no subshell and no pipe, so it is immune.
+cat <<'WRAP' >/opt/valheim/start-server.sh
+#!/bin/sh
+# Written by the valheim-panel installer. Every value comes from
+# /etc/valheim/server.env via the unit's EnvironmentFile.
+set -- -nographics -batchmode \
+  -name "$SERVER_NAME" \
+  -port "$SERVER_PORT" \
+  -world "$WORLD_NAME" \
+  -savedir "$SAVE_DIR" \
+  -public "$PUBLIC" \
+  -backups "$BACKUPS" \
+  -backupshort "$BACKUP_SHORT" \
+  -backuplong "$BACKUP_LONG"
+# No "set -e" and no "[ x ] && set -- ...": a false test would end the script.
+if [ -n "${SERVER_PASSWORD:-}" ]; then set -- "$@" -password "$SERVER_PASSWORD"; fi
+if [ "${CROSSPLAY:-}" = "1" ]; then set -- "$@" -crossplay; fi
+exec /opt/valheim/server/valheim_server.x86_64 "$@"
+WRAP
+chmod 755 /opt/valheim/start-server.sh
+cat <<EOF >/etc/systemd/system/valheim.service
+[Unit]
+Description=Valheim Dedicated Server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/valheim/server
+EnvironmentFile=/etc/valheim/server.env
+Environment=SteamAppId=892970
+# systemd does not set HOME for a system unit without User=, so the AUTO_UPDATE
+# steamcmd below would look for its Steam config somewhere other than /root and hit
+# the same "Missing configuration" as a fresh install -- silently, because of the
+# "|| true" that keeps a failed update from blocking the server start.
+Environment=HOME=/root
+Environment=LD_LIBRARY_PATH=/opt/valheim/server/linux64
+# The panel switches mods on by dropping bepinex.conf into valheim.service.d, which
+# overrides LD_LIBRARY_PATH and adds the Doorstop variables. Keep that out of this
+# file: it is rewritten on every reinstall and would take the mod loader with it.
+ExecStartPre=/bin/sh -c '[ "\$AUTO_UPDATE" = "1" ] && /opt/valheim/steamcmd/steamcmd.sh +force_install_dir /opt/valheim/server +login anonymous +app_update 896660 +quit || true'
+ExecStart=/opt/valheim/start-server.sh
+KillSignal=SIGINT
+TimeoutStopSec=120
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  $STD systemctl daemon-reload
+  msg_ok "Refreshed Service Definition"
+
 
   if check_for_gh_release "valheim-panel" "boehla/valheim-panel"; then
     msg_info "Stopping Panel"
