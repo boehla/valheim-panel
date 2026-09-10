@@ -309,9 +309,25 @@ const ago = (iso) => {
 };
 
 async function loadMods() {
+    // Not just the network: a 500 body parses perfectly well as JSON, and letting that
+    // through as `mods` used to take out the whole page on the next property access —
+    // silently, because nothing here is awaited.
+    let res;
     try {
-        mods = await (await api("/api/mods")).json();
-    } catch { return; }
+        res = await api("/api/mods");
+    } catch {
+        return;
+    }
+
+    if (!res.ok) {
+        $("mods-warning").hidden = false;
+        $("mods-warning").textContent = "Der Mod-Status ist nicht abrufbar: "
+            + ((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`)
+            + " — das Log unten sagt meist, woran es liegt.";
+        return;
+    }
+
+    mods = await res.json();
 
     renderLoader();
     renderInstalled();
@@ -514,8 +530,7 @@ function renderResults() {
         install.disabled = installed && installed.version === hit.version;
         install.onclick = async () => {
             install.disabled = true;
-            await api("/api/mods/install", { method: "POST", body: JSON.stringify({ fullName: hit.fullName }) });
-            pollJob();
+            if (!await startJob("/api/mods/install", { fullName: hit.fullName })) install.disabled = false;
         };
 
         actions.append(install);
@@ -528,29 +543,29 @@ function renderResults() {
 
 /* --- mod actions ------------------------------------------------------ */
 
-$("btn-loader-install").addEventListener("click", async () => {
-    await api("/api/mods/loader/install", { method: "POST" });
-    pollJob();
-});
+// Every one of these can come back 409 ("a job is already running") or fail outright, and
+// swallowing that is what makes a button look dead. Accepted (202) counts as ok.
+async function startJob(path, body) {
+    const res = await api(path, { method: "POST", body: body && JSON.stringify(body) });
+    if (res.ok) {
+        pollJob();
+        return true;
+    }
+    alert((await res.json().catch(() => ({}))).error || `Fehlgeschlagen (HTTP ${res.status}).`);
+    return false;
+}
+
+$("btn-loader-install").addEventListener("click", () => startJob("/api/mods/loader/install"));
 
 $("loader-enabled").addEventListener("change", async (e) => {
     await toggle("/api/mods/loader/enabled", e.target.checked);
 });
 
-$("btn-mods-update").addEventListener("click", async () => {
-    await api("/api/mods/update", { method: "POST" });
-    pollJob();
-});
+$("btn-mods-update").addEventListener("click", () => startJob("/api/mods/update"));
 
-$("btn-catalog").addEventListener("click", async () => {
-    await api("/api/mods/catalog/refresh", { method: "POST" });
-    pollJob();
-});
+$("btn-catalog").addEventListener("click", () => startJob("/api/mods/catalog/refresh"));
 
-$("btn-client-pack").addEventListener("click", async () => {
-    await api("/api/mods/client-pack", { method: "POST" });
-    pollJob();
-});
+$("btn-client-pack").addEventListener("click", () => startJob("/api/mods/client-pack"));
 
 /* --- mod configuration ------------------------------------------------ */
 

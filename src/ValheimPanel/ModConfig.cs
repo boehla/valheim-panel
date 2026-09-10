@@ -71,16 +71,16 @@ public static class ModConfig {
     public static List<ConfigFileInfo> List() {
         List<ConfigFileInfo> files = new List<ConfigFileInfo>();
 
-        foreach(string path in filesUnder(ConfigDir)) {
-            files.Add(describe(path, "BepInEx", true));
+        foreach(FileInfo file in filesUnder(ConfigDir)) {
+            files.Add(describe(file, "BepInEx", true));
         }
 
         foreach((string dir, bool enabled) in Mods.PackageDirs()) {
             ModMarker? marker = Mods.ReadMarker(Path.Combine(dir, Mods.MarkerName));
             string group = marker?.Name is { Length: > 0 } name ? name : Path.GetFileName(dir);
 
-            foreach(string path in filesUnder(dir)) {
-                files.Add(describe(path, group, enabled));
+            foreach(FileInfo file in filesUnder(dir)) {
+                files.Add(describe(file, group, enabled));
             }
         }
 
@@ -159,7 +159,14 @@ public static class ModConfig {
     /// mods page — a mod reads its configuration once, when it loads.
     /// </summary>
     internal static bool AnyChangedSince(DateTime moment) {
-        return List().Any(file => file.ModifiedAt > moment);
+        // This hangs off /api/mods, which the whole mods page depends on. A walk of the mod
+        // tree races with an install that is rewriting it, and a restart hint is never worth
+        // taking that page down for.
+        try {
+            return List().Any(file => file.ModifiedAt > moment);
+        } catch {
+            return false;
+        }
     }
 
     /* --- paths ------------------------------------------------------------ */
@@ -195,28 +202,43 @@ public static class ModConfig {
         return extensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
     }
 
-    static IEnumerable<string> filesUnder(string dir) {
-        if(!Directory.Exists(dir)) yield break;
+    /// <summary>
+    /// Every editable file below a directory. An install rewrites this tree while it runs, so
+    /// a file can be gone between being listed and being looked at; that is a file to skip,
+    /// not a listing to fail.
+    /// </summary>
+    static IEnumerable<FileInfo> filesUnder(string dir) {
+        string[] paths;
+        try {
+            paths = Directory.GetFiles(dir, "*", SearchOption.AllDirectories);
+        } catch {
+            yield break;
+        }
 
-        IEnumerable<string> paths = Directory
-            .EnumerateFiles(dir, "*", SearchOption.AllDirectories)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+        Array.Sort(paths, StringComparer.OrdinalIgnoreCase);
 
         foreach(string path in paths) {
             if(!editable(path)) continue;
-            if(new FileInfo(path).Length > maxRead) continue;
-            yield return path;
+
+            FileInfo file;
+            try {
+                file = new FileInfo(path);
+                if(file.Length > maxRead) continue;
+            } catch {
+                continue;
+            }
+
+            yield return file;
         }
     }
 
-    static ConfigFileInfo describe(string full, string group, bool enabled) {
-        FileInfo info = new FileInfo(full);
+    static ConfigFileInfo describe(FileInfo file, string group, bool enabled) {
         return new ConfigFileInfo {
-            Path = relative(full),
-            Name = Path.GetFileName(full),
+            Path = relative(file.FullName),
+            Name = file.Name,
             Group = group,
-            SizeBytes = info.Length,
-            ModifiedAt = info.LastWriteTime,
+            SizeBytes = file.Length,
+            ModifiedAt = file.LastWriteTime,
             Enabled = enabled
         };
     }
