@@ -108,6 +108,11 @@ Type=simple
 WorkingDirectory=/opt/valheim/server
 EnvironmentFile=/etc/valheim/server.env
 Environment=SteamAppId=892970
+# systemd does not set HOME for a system unit without User=, so the AUTO_UPDATE
+# steamcmd below would look for its Steam config somewhere other than /root and hit
+# the same "Missing configuration" as a fresh install -- silently, because of the
+# "|| true" that keeps a failed update from blocking the server start.
+Environment=HOME=/root
 Environment=LD_LIBRARY_PATH=/opt/valheim/server/linux64
 # The panel switches mods on by dropping bepinex.conf into valheim.service.d, which
 # overrides LD_LIBRARY_PATH and adds the Doorstop variables. Keep that out of this
