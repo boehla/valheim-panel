@@ -141,6 +141,30 @@
       <h3 class="sub">Installiert</h3>
       <div id="mod-list"><p class="hint">–</p></div>
 
+      <h3 class="sub">Konfiguration</h3>
+      <p class="hint">Die Konfigurationsdateien der installierten Mods, so wie sie auf der Platte
+      liegen. Die meisten Mods legen ihre Datei erst beim ersten Start an — vorher steht hier
+      nichts. Beim Speichern bleibt die vorherige Fassung als <code>.bak</code> daneben liegen.</p>
+
+      <p id="config-warning" class="warn" hidden>Der Server läuft. BepInEx schreibt die
+      Konfiguration beim Beenden teilweise zurück — was jetzt gespeichert wird, kann dabei wieder
+      verschwinden. Am besten gleich nach dem Speichern neu starten oder den Server vorher stoppen.</p>
+
+      <p id="config-empty" class="hint">Noch keine Konfigurationsdatei gefunden.</p>
+
+      <div id="config-editor" hidden>
+        <select id="config-file"></select>
+        <p id="config-meta" class="hint"></p>
+        <textarea id="config-text" spellcheck="false" autocomplete="off" wrap="off"></textarea>
+        <div class="mod-tools">
+          <button id="btn-config-save">Speichern</button>
+          <button id="btn-config-reload">Neu laden</button>
+          <button id="btn-config-restart" hidden>Server neu starten</button>
+          <button id="btn-config-reset" class="danger">Auf Standard zurücksetzen</button>
+        </div>
+        <p id="config-msg" hidden></p>
+      </div>
+
       <h3 class="sub">Paket für die Mitspieler</h3>
       <p class="hint">Ein Zip mit BepInEx und allen aktiven Mods, die als „für Clients“
       markiert sind. Die Spieler entpacken es in ihren Valheim-Ordner. Nach jeder

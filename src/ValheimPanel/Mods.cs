@@ -79,7 +79,7 @@ public static partial class Mods {
     const string patchersDisabledDir = "/opt/valheim/server/BepInEx/patchers-disabled";
     const string loaderMarkerFile = "/opt/valheim/server/BepInEx/valheim-panel-loader.json";
     const string dropInFile = "/etc/systemd/system/valheim.service.d/bepinex.conf";
-    const string markerName = "valheim-panel.json";
+    internal const string MarkerName = "valheim-panel.json";
 
     /// <summary>Thunderstore allows only these characters in a namespace or package name.</summary>
     [GeneratedRegex(@"^[A-Za-z0-9_]+-[A-Za-z0-9_]+$")]
@@ -102,7 +102,7 @@ public static partial class Mods {
 
         ModsState state = new ModsState { Catalog = Thunderstore.Info() };
 
-        ModMarker? loader = readMarker(loaderMarkerFile);
+        ModMarker? loader = ReadMarker(loaderMarkerFile);
         state.Loader.Installed = loader != null && Directory.Exists("/opt/valheim/server/BepInEx/core");
         state.Loader.Version = loader?.Version ?? "";
         state.Loader.Enabled = File.Exists(dropInFile);
@@ -111,8 +111,8 @@ public static partial class Mods {
             state.Loader.UpdateAvailable = state.Loader.Installed && loaderLatest.Version != state.Loader.Version;
         }
 
-        foreach((string dir, bool enabled) in packageDirs()) {
-            ModMarker? marker = readMarker(Path.Combine(dir, markerName));
+        foreach((string dir, bool enabled) in PackageDirs()) {
+            ModMarker? marker = ReadMarker(Path.Combine(dir, MarkerName));
             if(marker == null) continue;
 
             ModInfo info = new ModInfo {
@@ -172,14 +172,14 @@ public static partial class Mods {
                 continue;
             }
 
-            ModMarker? installed = readMarker(Path.Combine(packageDir(name), markerName));
+            ModMarker? installed = ReadMarker(Path.Combine(packageDir(name), MarkerName));
             if(installed != null && installed.Version == package.Version) {
                 log($"{package.Name} {package.Version} ist bereits installiert.");
                 // A dependency that the user now asks for by name becomes a manual pick,
                 // so a later cleanup does not treat it as disposable.
                 if(manual && name.Equals(fullName, StringComparison.OrdinalIgnoreCase) && !installed.Manual) {
                     installed.Manual = true;
-                    writeMarker(Path.Combine(packageDir(name), markerName), installed);
+                    writeMarker(Path.Combine(packageDir(name), MarkerName), installed);
                 }
                 continue;
             }
@@ -275,7 +275,7 @@ public static partial class Mods {
         string present = Directory.Exists(dir) ? dir : disabled;
         if(!Directory.Exists(present)) throw new Exception("Dieser Mod ist nicht installiert.");
 
-        ModMarker? marker = readMarker(Path.Combine(present, markerName));
+        ModMarker? marker = ReadMarker(Path.Combine(present, MarkerName));
         foreach(string relative in marker?.ExtraFiles ?? new List<string>()) {
             string path = Path.Combine(ServerControl.ServerDir, relative);
             try { if(File.Exists(path)) File.Delete(path); } catch { }
@@ -289,8 +289,8 @@ public static partial class Mods {
     /// <summary>Names of installed mods that list this one as a dependency.</summary>
     public static List<string> DependentsOf(string fullName) {
         List<string> dependents = new List<string>();
-        foreach((string dir, _) in packageDirs()) {
-            ModMarker? marker = readMarker(Path.Combine(dir, markerName));
+        foreach((string dir, _) in PackageDirs()) {
+            ModMarker? marker = ReadMarker(Path.Combine(dir, MarkerName));
             if(marker == null || marker.FullName.Equals(fullName, StringComparison.OrdinalIgnoreCase)) continue;
             if(marker.Dependencies.Any(d => d.Equals(fullName, StringComparison.OrdinalIgnoreCase))) dependents.Add(marker.Name);
         }
@@ -328,8 +328,8 @@ public static partial class Mods {
         requireValidName(fullName);
 
         string dir = Directory.Exists(packageDir(fullName)) ? packageDir(fullName) : Path.Combine(DisabledDir, fullName);
-        string path = Path.Combine(dir, markerName);
-        ModMarker marker = readMarker(path) ?? throw new Exception("Dieser Mod ist nicht installiert.");
+        string path = Path.Combine(dir, MarkerName);
+        ModMarker marker = ReadMarker(path) ?? throw new Exception("Dieser Mod ist nicht installiert.");
 
         marker.Client = client;
         writeMarker(path, marker);
@@ -352,7 +352,7 @@ public static partial class Mods {
             if(package == null) continue;
 
             log($"{mod.Name} {mod.Version} → {package.Version}");
-            ModMarker? current = readMarker(Path.Combine(installedDir(mod.FullName), markerName));
+            ModMarker? current = ReadMarker(Path.Combine(installedDir(mod.FullName), MarkerName));
             await installOneAsync(log, package, mod.Manual, current);
             updated++;
         }
@@ -368,7 +368,7 @@ public static partial class Mods {
     /// from the installed state and not from a list somebody keeps by hand.
     /// </summary>
     public static async Task BuildClientPackAsync(Action<string> log) {
-        ModMarker loader = readMarker(loaderMarkerFile) ?? throw new Exception("BepInEx ist nicht installiert.");
+        ModMarker loader = ReadMarker(loaderMarkerFile) ?? throw new Exception("BepInEx ist nicht installiert.");
         string loaderZip = Path.Combine(Thunderstore.CacheDir, $"{loader.FullName}-{loader.Version}.zip");
 
         if(!File.Exists(loaderZip)) {
@@ -378,8 +378,8 @@ public static partial class Mods {
         }
 
         List<ModMarker> included = new List<ModMarker>();
-        foreach((string dir, bool enabled) in packageDirs()) {
-            ModMarker? marker = readMarker(Path.Combine(dir, markerName));
+        foreach((string dir, bool enabled) in PackageDirs()) {
+            ModMarker? marker = ReadMarker(Path.Combine(dir, MarkerName));
             if(marker != null && enabled && marker.Client) included.Add(marker);
         }
 
@@ -509,7 +509,7 @@ public static partial class Mods {
             }
         }
 
-        writeMarker(Path.Combine(target, markerName), marker);
+        writeMarker(Path.Combine(target, MarkerName), marker);
         log($"{package.Name} {package.Version} installiert ({files} Dateien){(wasDisabled ? ", bleibt deaktiviert" : "")}.");
     }
 
@@ -629,11 +629,11 @@ public static partial class Mods {
 
     /* --- state on disk -------------------------------------------------- */
 
-    static IEnumerable<(string Dir, bool Enabled)> packageDirs() {
+    internal static IEnumerable<(string Dir, bool Enabled)> PackageDirs() {
         foreach((string root, bool enabled) in new[] { (PluginsDir, true), (DisabledDir, false) }) {
             if(!Directory.Exists(root)) continue;
             foreach(string dir in Directory.GetDirectories(root)) {
-                if(File.Exists(Path.Combine(dir, markerName))) yield return (dir, enabled);
+                if(File.Exists(Path.Combine(dir, MarkerName))) yield return (dir, enabled);
             }
         }
     }
@@ -645,7 +645,7 @@ public static partial class Mods {
         return Directory.Exists(active) ? active : Path.Combine(DisabledDir, fullName);
     }
 
-    static ModMarker? readMarker(string path) {
+    internal static ModMarker? ReadMarker(string path) {
         if(!File.Exists(path)) return null;
         try {
             return JsonSerializer.Deserialize<ModMarker>(File.ReadAllText(path));
@@ -671,19 +671,22 @@ public static partial class Mods {
         if(File.Exists(dropInFile) != state.Loader.Enabled) return true;
         if(File.Exists(dropInFile) && File.GetLastWriteTime(dropInFile) > started) return true;
 
-        foreach((string dir, _) in packageDirs()) {
+        foreach((string dir, _) in PackageDirs()) {
             if(Directory.GetLastWriteTime(dir) > started) return true;
         }
-        return false;
+
+        // A directory timestamp does not move when a file inside it is edited, so an edited
+        // config needs its own look — and a mod reads its settings once, when it loads.
+        return ModConfig.AnyChangedSince(started);
     }
 
     static void pruneCache() {
         List<string> keep = new List<string>();
-        ModMarker? loader = readMarker(loaderMarkerFile);
+        ModMarker? loader = ReadMarker(loaderMarkerFile);
         if(loader != null) keep.Add($"{loader.FullName}-{loader.Version}.zip");
 
-        foreach((string dir, _) in packageDirs()) {
-            ModMarker? marker = readMarker(Path.Combine(dir, markerName));
+        foreach((string dir, _) in PackageDirs()) {
+            ModMarker? marker = ReadMarker(Path.Combine(dir, MarkerName));
             if(marker != null) keep.Add($"{marker.FullName}-{marker.Version}.zip");
         }
         Thunderstore.PruneCache(keep);

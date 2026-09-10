@@ -124,6 +124,30 @@ Turn **`AUTO_UPDATE` off on a modded server.** A new Valheim build invalidates e
 assembly the mods were compiled against, so an unattended SteamCMD update on the next
 restart is an unattended way to break the server. The panel says so when both are on.
 
+### Editing a mod's configuration
+
+**Konfiguration** is a plain text editor over the files the installed mods keep their settings
+in: everything under `BepInEx/config/`, plus config-shaped files inside the package directories
+(`.cfg .json .yml .yaml .ini .txt .xml` — an allowlist, so the DLLs and the panel's own
+`valheim-panel.json` stay out of reach). Nothing here knows what a setting means; that is what
+makes it work for [ValheimPlus](https://github.com/Grantapher/ValheimPlus), whose hundreds of
+keys move between releases, as well as for a mod released tomorrow.
+
+Two BepInEx habits are worth knowing:
+
+- **A plugin creates its config file the first time it loads.** ValheimPlus's
+  `org.bepinex.plugins.valheim_plus.cfg` does not exist until the server has run once with the
+  mod active — until then the picker has nothing to show for it.
+- **A plugin writes its config back when it shuts down.** Saving into a running server can
+  therefore be undone by the server itself. The editor warns while the server is up, and every
+  save carries the timestamp the browser loaded: if the file moved on in the meantime, the save
+  is refused instead of overwriting what BepInEx wrote.
+
+Saving keeps the previous version as `<name>.bak` next to the file, and **Auf Standard
+zurücksetzen** deletes the file — with the same `.bak` — so the mod writes a fresh one with its
+defaults on the next start. Mods read their configuration when they load, so a change needs a
+server restart; the mods page says so, and the editor offers the restart directly.
+
 ### The client pack
 
 Valheim refuses a connection when the mod sets do not line up, so every player needs the

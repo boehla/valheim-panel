@@ -2,6 +2,7 @@ const $ = (id) => document.getElementById(id);
 
 let token = sessionStorage.getItem("panelToken") || "";
 let settingsLoaded = false;
+let serverRunning = false;
 
 async function api(path, options = {}) {
     const res = await fetch(path, {
@@ -73,6 +74,9 @@ async function refresh() {
 }
 
 function renderStatus(s) {
+    serverRunning = s.running;
+    renderConfigWarning();
+
     const accent = s.running ? "var(--pine)" : (s.state === "failed" ? "var(--ember)" : "var(--muted)");
     document.documentElement.style.setProperty("--state", accent);
 
@@ -176,7 +180,8 @@ async function pollJob() {
         $("job-log").scrollTop = $("job-log").scrollHeight;
 
         for (const id of ["btn-update-server", "btn-update-panel", "btn-backup",
-                          "btn-mods-update", "btn-catalog", "btn-client-pack", "btn-loader-install"]) {
+                          "btn-mods-update", "btn-catalog", "btn-client-pack", "btn-loader-install",
+                          "btn-config-save", "btn-config-reset"]) {
             $(id).disabled = job.running;
         }
 
@@ -311,6 +316,7 @@ async function loadMods() {
     renderLoader();
     renderInstalled();
     renderResults();
+    loadConfigs();
 
     $("client-pack-link").hidden = !mods.clientPackReady;
     $("client-pack-age").textContent = mods.clientPackReady
@@ -544,6 +550,164 @@ $("btn-catalog").addEventListener("click", async () => {
 $("btn-client-pack").addEventListener("click", async () => {
     await api("/api/mods/client-pack", { method: "POST" });
     pollJob();
+});
+
+/* --- mod configuration ------------------------------------------------ */
+
+// The editor holds the file exactly as it came off disk, plus the timestamp it came with.
+// That timestamp goes back with every save, because BepInEx rewrites config files when the
+// server shuts down — without it, saving into a running server would quietly undo whatever
+// the server itself had just written.
+let configs = [];
+let configFile = null;
+let configDirty = false;
+
+async function loadConfigs() {
+    try {
+        configs = await (await api("/api/mods/configs")).json();
+    } catch { return; }
+    renderConfigList();
+}
+
+function renderConfigList() {
+    const select = $("config-file");
+    const wanted = configFile?.path || select.value;
+
+    $("config-empty").hidden = configs.length > 0;
+    $("config-editor").hidden = configs.length === 0;
+
+    if (!configs.length) {
+        $("config-empty").textContent = mods.mods.length
+            ? "Noch keine Konfigurationsdatei gefunden. Die meisten Mods legen sie erst beim ersten Start des Servers an."
+            : "Noch keine Mods installiert — also auch nichts zu konfigurieren.";
+        configFile = null;
+        return;
+    }
+
+    const groups = new Map();
+    for (const file of configs) {
+        if (!groups.has(file.group)) groups.set(file.group, []);
+        groups.get(file.group).push(file);
+    }
+
+    select.replaceChildren(...[...groups].map(([name, files]) => {
+        const group = document.createElement("optgroup");
+        group.label = files[0].enabled ? name : `${name} (deaktiviert)`;
+        group.append(...files.map(file => {
+            const option = document.createElement("option");
+            option.value = file.path;
+            option.textContent = file.name;
+            return option;
+        }));
+        return group;
+    }));
+
+    if (configs.some(file => file.path === wanted)) select.value = wanted;
+
+    // A reload triggered by something else must not throw away what is being typed,
+    // nor the message from whatever caused that reload.
+    if (!configDirty && select.value !== configFile?.path) openConfig(select.value, true);
+}
+
+async function openConfig(path, keepMessage = false) {
+    const res = await api(`/api/mods/config?path=${encodeURIComponent(path)}`);
+    if (!res.ok) {
+        configFile = null;
+        $("config-text").value = "";
+        configMessage("error", (await res.json()).error);
+        return;
+    }
+
+    configFile = await res.json();
+    configDirty = false;
+    $("config-text").value = configFile.text;
+    $("config-meta").textContent = `${configFile.path} · geändert ${new Date(configFile.modifiedAt).toLocaleString("de-AT")}`;
+    $("btn-config-restart").hidden = true;
+    if (!keepMessage) configMessage("", "");
+}
+
+function configMessage(kind, text) {
+    const msg = $("config-msg");
+    msg.hidden = !text;
+    msg.className = kind;
+    msg.textContent = text;
+}
+
+// Shown from the polled status, so it stays right when the server is started or stopped
+// from another tab while the editor is open.
+function renderConfigWarning() {
+    $("config-warning").hidden = !serverRunning;
+}
+
+$("config-text").addEventListener("input", () => {
+    configDirty = true;
+});
+
+$("config-file").addEventListener("change", (e) => {
+    if (configDirty && !confirm("Die Änderungen an dieser Datei sind nicht gespeichert. Verwerfen?")) {
+        e.target.value = configFile.path;
+        return;
+    }
+    openConfig(e.target.value);
+});
+
+$("btn-config-reload").addEventListener("click", () => {
+    if (!configFile) return;
+    if (configDirty && !confirm("Die Änderungen an dieser Datei sind nicht gespeichert. Verwerfen?")) return;
+    openConfig(configFile.path);
+});
+
+$("btn-config-save").addEventListener("click", async () => {
+    if (!configFile) return;
+
+    const res = await api("/api/mods/config", {
+        method: "PUT",
+        body: JSON.stringify({
+            path: configFile.path,
+            text: $("config-text").value,
+            stamp: configFile.stamp
+        })
+    });
+    const body = await res.json();
+
+    if (!res.ok) {
+        configMessage("error", res.status === 409
+            ? `${body.error} Über „Neu laden“ kommt die aktuelle Fassung — die Änderungen hier gehen dabei verloren.`
+            : body.error);
+        return;
+    }
+
+    configFile = body.content;
+    configDirty = false;
+    $("config-meta").textContent = `${configFile.path} · geändert ${new Date(configFile.modifiedAt).toLocaleString("de-AT")}`;
+    $("btn-config-restart").hidden = false;
+    configMessage("ok", "Gespeichert. Der Mod liest die Datei beim nächsten Start des Servers.");
+    loadMods();
+});
+
+$("btn-config-restart").addEventListener("click", async () => {
+    if (!confirm("Server neu starten? Spieler fliegen raus, die Welt wird vorher gespeichert.")) return;
+    await api("/api/server/restart", { method: "POST" });
+    $("btn-config-restart").hidden = true;
+    refresh();
+});
+
+$("btn-config-reset").addEventListener("click", async () => {
+    if (!configFile) return;
+    if (!confirm(`"${configFile.name}" löschen?\n\nDer Mod legt die Datei beim nächsten Start mit seinen Standardwerten neu an. Die bisherige Fassung bleibt als .bak daneben liegen.`)) return;
+
+    const res = await api(`/api/mods/config?path=${encodeURIComponent(configFile.path)}`, { method: "DELETE" });
+    if (!res.ok) {
+        configMessage("error", (await res.json()).error);
+        return;
+    }
+
+    configFile = null;
+    configDirty = false;
+    $("config-text").value = "";
+    $("config-meta").textContent = "";
+    configMessage("ok", "Zurückgesetzt. Die Datei entsteht beim nächsten Start des Servers neu.");
+    loadMods();
 });
 
 /* --- panel self-update ------------------------------------------------ */

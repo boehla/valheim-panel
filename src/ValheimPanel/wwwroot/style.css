@@ -191,6 +191,8 @@ form label {
 /* Not by type: an <input> without an explicit type is a text field, and listing the
    types left exactly those rendering narrow next to the ones that matched. */
 form input:not([type="checkbox"]),
+textarea,
+select,
 .gate-box input {
     display: block;
     width: 100%;
@@ -365,6 +367,26 @@ pre {
 }
 
 .mod-tools .hint { margin: 0; }
+
+/* --- mod configuration ------------------------------------------------ */
+
+#config-file { margin-bottom: 0.6rem; }
+#config-meta { margin: -0.2rem 0 0.5rem; font-size: 0.78rem; }
+
+/* Config files are line based and a wrapped line reads as two settings, so this one
+   scrolls sideways instead. */
+#config-text {
+    min-height: 24rem;
+    margin-bottom: 0.8rem;
+    resize: vertical;
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    tab-size: 4;
+}
+
+#config-msg { margin: 0.8rem 0 0; font-size: 0.85rem; }
 
 .download {
     font-weight: 600;

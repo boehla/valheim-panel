@@ -198,6 +198,40 @@ app.MapGet("/api/mods/client-pack", () => {
     return Results.File(Mods.ClientPackFile, "application/zip", "valheim-mods.zip");
 });
 
+/* --- mod configuration ------------------------------------------------ */
+
+app.MapGet("/api/mods/configs", () => Results.Ok(ModConfig.List()));
+
+app.MapGet("/api/mods/config", (string? path) => {
+    try {
+        return Results.Ok(ModConfig.Read(path ?? ""));
+    } catch(Exception ex) {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+// The conflict is its own status code: the browser has to tell "you sent nonsense" apart from
+// "the file changed under you", because only the second one is worth offering a reload for.
+app.MapPut("/api/mods/config", (ConfigWriteRequest req) => {
+    try {
+        ConfigContent content = ModConfig.Write(req.Path, req.Text, req.Stamp);
+        return Results.Ok(new { ok = true, content, restartRequired = true });
+    } catch(StaleConfigException ex) {
+        return Results.Conflict(new { error = ex.Message });
+    } catch(Exception ex) {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapDelete("/api/mods/config", (string? path) => {
+    try {
+        ModConfig.Reset(path ?? "");
+        return Results.Ok(new { ok = true });
+    } catch(Exception ex) {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 app.MapGet("/api/panel/update", async () => {
     try {
         return Results.Ok(await SelfUpdate.CheckAsync());
@@ -219,3 +253,4 @@ record RestoreRequest(string FileName);
 record RegenerateRequest(string Confirm, string? NewWorldName);
 record ModRequest(string FullName);
 record ToggleRequest(bool Value);
+record ConfigWriteRequest(string Path, string Text, long Stamp);
