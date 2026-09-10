@@ -97,11 +97,16 @@ chmod 600 /opt/valheim-panel/.env
 msg_ok "Configured Valheim"
 
 msg_info "Creating Service"
-# The argument list is built in a real shell script, not in ExecStart. ExecStart is
-# not a shell command line: systemd resolves $... in it by its own rules before
-# /bin/sh ever runs, which silently swallowed the $(...) that appended -password and
-# -crossplay. A public server then started with an empty password and refused to boot
-# ("Error bad password:The password is too short"), and crossplay never turned on.
+# The argument list is built in a real shell script, not with $(...) inside ExecStart.
+# The mod loader's drop-in preloads libdoorstop_x64.so into the whole unit -- the shell
+# that runs ExecStart included -- and Doorstop hooks dup2, which is exactly what a shell
+# uses to wire a command substitution to its pipe. With it loaded,
+# $([ -n "$SERVER_PASSWORD" ] && echo -password "$SERVER_PASSWORD") returned nothing and
+# the echo output leaked to stdout instead, so -password and -crossplay silently
+# disappeared from the command line. A public server then started with an empty password
+# and Valheim refused it: "Error bad password:The password is too short". Only modded
+# servers were affected -- without the drop-in the substitution worked fine.
+# set -- uses builtins only, no subshell and no pipe, so it is immune.
 cat <<'WRAP' >/opt/valheim/start-server.sh
 #!/bin/sh
 # Written by the valheim-panel installer. Every value comes from
