@@ -597,6 +597,12 @@ public static partial class Mods {
         if(!written.Add(relative)) return;
 
         ZipArchiveEntry target = pack.CreateEntry(relative, CompressionLevel.Optimal);
+        // Thunderstore zips carry no execute bit, so start_game_bepinex.sh unpacked on Linux as a
+        // plain file that Steam cannot launch. Mode 0755 in the upper half of the external
+        // attributes is what unzip and the desktop archive tools restore.
+        if(relative.EndsWith(".sh", StringComparison.OrdinalIgnoreCase)) {
+            target.ExternalAttributes = Convert.ToInt32("100755", 8) << 16;
+        }
         using(Stream from = entry.Open())
         using(Stream to = target.Open()) {
             from.CopyTo(to);
@@ -611,12 +617,37 @@ public static partial class Mods {
         text.AppendLine("So installierst du sie:");
         text.AppendLine();
         text.AppendLine("1. Steam -> Rechtsklick auf Valheim -> Verwalten -> Lokale Dateien durchsuchen.");
-        text.AppendLine("2. Den gesamten Inhalt dieses Archivs dorthin entpacken, direkt neben valheim.exe.");
-        text.AppendLine("3. Valheim ganz normal über Steam starten. Der erste Start dauert etwas länger.");
+        text.AppendLine("2. Den gesamten Inhalt dieses Archivs in diesen Ordner entpacken.");
+        text.AppendLine("3. Je nach System wie unten beschrieben weiter.");
+        text.AppendLine();
+        text.AppendLine("Windows");
+        text.AppendLine("-------");
+        text.AppendLine("Nichts weiter zu tun: Valheim ganz normal über Steam starten. Beim Start öffnet");
+        text.AppendLine("sich ein Konsolenfenster, und der erste Start dauert etwas länger.");
+        text.AppendLine();
+        text.AppendLine("Linux");
+        text.AppendLine("-----");
+        text.AppendLine("Die winhttp.dll wirkt unter Linux nicht, BepInEx braucht dort eine Startoption.");
+        text.AppendLine("Welche, hängt davon ab, was im Spielordner liegt:");
+        text.AppendLine();
+        text.AppendLine("valheim.x86_64 (Valheim läuft nativ, der Normalfall):");
+        text.AppendLine("  Steam -> Rechtsklick auf Valheim -> Eigenschaften -> Startoptionen:");
+        text.AppendLine("      ./start_game_bepinex.sh %command%");
+        text.AppendLine("  Ein Konsolenfenster gibt es dabei nicht, das ist normal. Startet das Spiel");
+        text.AppendLine("  mit dieser Startoption gar nicht, hat das Entpackprogramm das");
+        text.AppendLine("  Ausführungsrecht nicht übernommen. Dann im Spielordner einmal ausführen:");
+        text.AppendLine("      chmod u+x start_game_bepinex.sh");
+        text.AppendLine();
+        text.AppendLine("valheim.exe (Valheim läuft über Proton):");
+        text.AppendLine("  Startoptionen:");
+        text.AppendLine("      WINEDLLOVERRIDES=\"winhttp=n,b\" %command%");
         text.AppendLine();
         text.AppendLine("Alle Mitspieler brauchen exakt diese Dateien, sonst lässt der Server nicht");
-        text.AppendLine("verbinden. Zum Entfernen die Ordner BepInEx und doorstop_libs sowie die Dateien");
-        text.AppendLine("winhttp.dll und doorstop_config.ini wieder löschen.");
+        text.AppendLine("verbinden.");
+        text.AppendLine();
+        text.AppendLine("Zum Entfernen die Ordner BepInEx und doorstop_libs sowie die Dateien winhttp.dll,");
+        text.AppendLine("doorstop_config.ini und start_game_bepinex.sh löschen. Unter Linux zusätzlich die");
+        text.AppendLine("Startoption in Steam wieder leeren.");
         text.AppendLine();
         text.AppendLine($"BepInEx {loader.Version}");
         foreach(ModMarker mod in mods.OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase)) {
