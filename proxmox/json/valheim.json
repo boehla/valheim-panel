@@ -43,6 +43,10 @@
     {
       "text": "8 GB RAM is a realistic minimum for a full 10-player world. The initial SteamCMD download is roughly 2.5 GB.",
       "type": "info"
+    },
+    {
+      "text": "The container is pinned to CPUs 0 to cores-1 (lxc.cgroup2.cpuset.cpus). Crossplay silently stops handing out join codes when Proxmox moves an LXC onto other cores, so keep that line when changing the CPU settings.",
+      "type": "info"
     }
   ]
 }

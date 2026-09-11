@@ -194,6 +194,24 @@ server logs `DLL Not Found` once at start and crossplay never comes up. The inst
 script installs it — containers created before it did need `apt install -y libpulse-dev`
 and a restart.
 
+The container is also pinned to CPUs `0` to `cores-1`. PlayFab Party pins its worker
+threads to CPUs 0…N-1, where N is how many CPUs it sees — a count, not the IDs. An LXC sees
+the host's IDs, and `pvestatd` moves the cores of an unpinned container around while it
+runs, so a 4-core container can end up on `6,10,13,22`. The affinity call then fails,
+`PartyInitialize` returns *unmapped platform error*, PlayFab's Unity layer drops that
+without a log line, and the log shows nothing but `begin PlayFab create and join network`
+and `PlayFab reconnect server` every 30 seconds — no join code, and not one packet goes
+out to PlayFab. It keeps working for as long as one of CPUs 0…N-1 happens to be in the set,
+which is why it can break in the middle of a running session.
+
+The install writes `lxc.cgroup2.cpuset.cpus: 0-3` (for 4 cores) into the container config
+and restarts the container once. A container created before that needs it by hand:
+`cat /sys/devices/system/cpu/online` inside it shows the CPUs it has, and an update warns
+when they are not `0-<cores-1>`. On the host the line goes into the main section of
+`/etc/pve/lxc/<CTID>.conf`, above the first `[snapshot]` header — appended to the end of a
+container that has snapshots, it lands in the last one and is silently ignored. Then
+restart the container. Two Valheim containers on one host share the same cores this way.
+
 Once both are set, the log reads `Session "…" registered with join code 123456`, and the
 panel shows the code under the status header. Without crossplay, players use
 **Join IP** with the server's address and port 2456 (UDP 2456–2458 forwarded if they are

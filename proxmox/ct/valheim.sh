@@ -164,13 +164,71 @@ EOF
   msg_info "Starting Valheim Server"
   systemctl start valheim
   msg_ok "Started Valheim Server"
+
+  # See pin_crossplay_cpus below. Only the host can pin, and this runs inside the
+  # container, so a container created before the pin existed only gets told.
+  local cpus expected
+  cpus="$(cat /sys/devices/system/cpu/online 2>/dev/null)"
+  expected="0-$(($(nproc) - 1))"
+  [[ "$(nproc)" == "1" ]] && expected="0"
+  if [[ -n "$cpus" && "$cpus" != "$expected" ]]; then
+    msg_warn "This container runs on host CPUs ${cpus}, not ${expected} -- crossplay can lose its join code (see README)"
+    msg_warn "On the Proxmox host add 'lxc.cgroup2.cpuset.cpus: ${expected}' to /etc/pve/lxc/<CTID>.conf above any [snapshot] section, then restart the container"
+  fi
   msg_ok "Updated successfully!"
   exit
+}
+
+# PlayFab Party, which crossplay runs on, pins its worker threads to CPUs 0..N-1 where N
+# is how many CPUs it sees -- a count, not the IDs. An LXC sees the host's CPU IDs, and
+# pvestatd moves the cores of an unpinned container around while it runs, so a 4-core
+# container can sit on 6,10,13,22. The affinity call then fails with EINVAL,
+# PartyInitialize returns "unmapped platform error", PlayFab's Unity layer drops that
+# without a log line, and the server loops on "begin PlayFab create and join network"
+# without ever getting a join code. Pinning to 0..N-1 makes the IDs match the count and
+# keeps pvestatd from moving them.
+function pin_crossplay_cpus() {
+  local conf="/etc/pve/lxc/${CTID}.conf"
+  [[ -f "$conf" ]] || return 0
+  local cores
+  cores="$(pct config "$CTID" | awk '/^cores:/ {print $2}')"
+  # Without a core limit the container sees every host CPU from 0 up, which already works.
+  [[ -n "$cores" ]] || return 0
+  # Only the main section counts: everything after the first [snapshot] header belongs to
+  # that snapshot and is ignored. A pin somebody set by hand is left alone.
+  if awk '/^\[/ {exit} /^lxc\.cgroup2?\.cpuset\.cpus:/ {found = 1} END {exit !found}' "$conf"; then
+    return 0
+  fi
+  local key="lxc.cgroup2.cpuset.cpus"
+  [[ "$(stat -fc %T /sys/fs/cgroup)" == "cgroup2fs" ]] || key="lxc.cgroup.cpuset.cpus"
+  local range="0-$((cores - 1))"
+  [[ "$cores" == "1" ]] && range="0"
+
+  msg_info "Pinning the container to CPUs ${range} for crossplay"
+  # Goes in above the blank line that separates the main section from the first snapshot.
+  local content
+  content="$(awk -v line="${key}: ${range}" '
+    !done && /^$/ {blank = blank $0 "\n"; next}
+    !done && /^\[/ {print line; done = 1}
+    {printf "%s", blank; blank = ""; print}
+    END {if (!done) print line}' "$conf")"
+  printf '%s\n' "$content" >"$conf"
+  msg_ok "Pinned the container to CPUs ${range}"
+
+  # The install already started Valheim once, and if the cores were elsewhere its PlayFab
+  # setup failed for that whole run. A cpuset only applies when the container starts.
+  msg_info "Restarting LXC Container"
+  if ! pct reboot "$CTID"; then
+    msg_warn "Could not restart CT ${CTID} -- restart it by hand so the CPU pin takes effect"
+    return 0
+  fi
+  msg_ok "Restarted LXC Container"
 }
 
 start
 build_container
 description
+pin_crossplay_cpus
 
 msg_ok "Completed Successfully!\n"
 echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
