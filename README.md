@@ -80,6 +80,17 @@ starts the server again. If the archive holds a different world than the one con
 the job log says so — the files land correctly, but the server only loads them once the
 world name in the settings matches.
 
+Every archive can be downloaded from its row, and an archive can be uploaded to move a
+world onto the server — a download from another panel, or a world packed by hand with
+`tar -czf welt.tar.gz -C worlds_local MeineWelt`. An upload is only filed, never unpacked;
+it lands as a `perma` archive (keeping the timestamp if its name is one of ours) and goes
+live through the normal restore. Because restore deletes the directory an archive names
+and unpacks into `worlds_local`, an upload has to look exactly like an archive the panel
+wrote: regular files and directories only, no absolute paths, `..` or `./` prefix, and
+either a single world directory with a `.db2`/`.fwl2` in it or the loose `.db`/`.fwl` of
+one pre-1.0 world. Anything else is refused before it reaches the backup directory.
+Uploads go up to 4 GB.
+
 **Welt neu generieren** deletes the current world so Valheim builds a new one on the next
 start. A permanent backup is made first, and its success gates the deletion: if the
 archive cannot be written, nothing is removed. Confirmation is the world name typed in

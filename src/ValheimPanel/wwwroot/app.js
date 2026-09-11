@@ -229,6 +229,7 @@ async function loadBackups() {
         world.textContent = b.worldName;
 
         const size = document.createElement("td");
+        size.className = "size";
         size.textContent = `${(b.sizeBytes / 1048576).toFixed(1)} MB`;
 
         const actions = document.createElement("td");
@@ -242,6 +243,13 @@ async function loadBackups() {
             pollJob();
         };
 
+        // A link, not a fetch: the browser streams it to disk itself, and the login cookie
+        // stands in for the token header.
+        const download = document.createElement("a");
+        download.href = `/api/backups/${encodeURIComponent(b.fileName)}`;
+        download.download = b.fileName;
+        download.textContent = "Herunterladen";
+
         const remove = document.createElement("button");
         remove.className = "danger";
         remove.textContent = "Löschen";
@@ -252,7 +260,7 @@ async function loadBackups() {
             loadBackups();
         };
 
-        actions.append(restore, remove);
+        actions.append(restore, download, remove);
         row.append(when, world, size, actions);
         return row;
     }));
@@ -260,6 +268,67 @@ async function loadBackups() {
 
 $("btn-backup").addEventListener("click", () => {
     startJob("/api/backups", { permanent: $("backup-perma").checked });
+});
+
+function backupMessage(kind, text) {
+    const msg = $("backup-msg");
+    msg.hidden = !text;
+    msg.className = kind;
+    msg.textContent = text;
+}
+
+$("btn-backup-upload").addEventListener("click", () => $("backup-file").click());
+
+// XMLHttpRequest rather than api(): fetch says nothing while a request body goes out, and a
+// few hundred MB over a home uplink is a long time to look at a button that seems to do nothing.
+$("backup-file").addEventListener("change", () => {
+    const file = $("backup-file").files[0];
+    // Cleared so picking the same file again after a failure fires "change" again.
+    $("backup-file").value = "";
+    if (!file) return;
+
+    const button = $("btn-backup-upload");
+    button.disabled = true;
+    backupMessage("", `Lade ${file.name} hoch …`);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/backups/upload?name=${encodeURIComponent(file.name)}`);
+    xhr.setRequestHeader("X-Panel-Token", token);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+
+    // The last few seconds after 100 % are the server listing the archive, not the network.
+    xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        backupMessage("", e.loaded < e.total
+            ? `Lade ${file.name} hoch … ${Math.floor(e.loaded / e.total * 100)} %`
+            : "Hochgeladen, prüfe das Archiv …");
+    };
+
+    xhr.onload = () => {
+        button.disabled = false;
+        if (xhr.status === 401) {
+            sessionStorage.removeItem("panelToken");
+            location.reload();
+            return;
+        }
+
+        let body = {};
+        try { body = JSON.parse(xhr.responseText); } catch { }
+
+        if (xhr.status !== 200) {
+            backupMessage("error", body.error || `Hochladen fehlgeschlagen (HTTP ${xhr.status}).`);
+            return;
+        }
+        backupMessage("ok", `Abgelegt als ${body.fileName}. Eingespielt wird sie erst über „Wiederherstellen“.`);
+        loadBackups();
+    };
+
+    xhr.onerror = () => {
+        button.disabled = false;
+        backupMessage("error", "Die Verbindung ist beim Hochladen abgebrochen.");
+    };
+
+    xhr.send(file);
 });
 
 /* --- world regeneration ----------------------------------------------- */

@@ -251,6 +251,9 @@ pre {
 }
 
 .backup-actions .check { margin: 0; }
+.backup-actions .push { margin-left: auto; }
+
+#backup-msg { margin: -0.5rem 0 1rem; font-size: 0.85rem; }
 
 .backups {
     width: 100%;
@@ -265,6 +268,7 @@ pre {
 }
 
 .backups td.muted { color: var(--muted); border-bottom: none; }
+.backups td.size { white-space: nowrap; }
 .backups tr td:last-child { padding-right: 0; }
 
 .badge {
@@ -279,11 +283,23 @@ pre {
 
 .row-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.4rem;
     justify-content: flex-end;
 }
 
-.row-actions button { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+.row-actions button,
+.row-actions a { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+
+/* A download is a link so the browser saves it itself, but in a row of buttons it has to look like one. */
+.row-actions a {
+    font-weight: 600;
+    color: var(--fog);
+    background: var(--rune);
+    text-decoration: none;
+}
+
+.row-actions a:hover { filter: brightness(1.2); }
 
 /* --- mods ------------------------------------------------------------- */
 

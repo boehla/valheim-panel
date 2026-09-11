@@ -103,10 +103,16 @@
     <p class="hint">Eigene Sicherungen der Welt, unabhängig von denen, die Valheim selbst
     rotiert. Dauerhafte werden nie automatisch gelöscht, die übrigen nur, solange mehr
     als zehn davon liegen. <span id="auto-backup-hint"></span></p>
+    <p class="hint">Hochladen nimmt ein <code>tar.gz</code> mit dem Weltordner (oder den alten
+    <code>.db</code>/<code>.fwl</code>-Dateien) an, z. B. eine hier heruntergeladene Sicherung.
+    Es wird dauerhaft abgelegt und erst über „Wiederherstellen“ eingespielt.</p>
     <div class="backup-actions">
       <button id="btn-backup">Sicherung erstellen</button>
       <label class="check"><input id="backup-perma" type="checkbox"> dauerhaft aufbewahren</label>
+      <button id="btn-backup-upload" class="push">Hochladen …</button>
+      <input id="backup-file" type="file" accept=".gz,.tgz" hidden>
     </div>
+    <p id="backup-msg" hidden></p>
     <table class="backups">
       <tbody id="backup-list"><tr><td>–</td></tr></tbody>
     </table>

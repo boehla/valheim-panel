@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.FileProviders;
 using ValheimPanel;
 
@@ -96,6 +97,29 @@ app.MapDelete("/api/backups/{fileName}", (string fileName) => {
     try {
         Backups.Delete(fileName);
         return Results.Ok(new { ok = true });
+    } catch(Exception ex) {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+// A plain link like the client pack, so the login cookie carries the token.
+app.MapGet("/api/backups/{fileName}", (string fileName) => {
+    string? path = Backups.PathOf(fileName);
+    if(path == null) return Results.NotFound(new { error = "Sicherung nicht gefunden." });
+    return Results.File(path, "application/gzip", fileName, enableRangeProcessing: true);
+});
+
+// The archive is the raw request body, not a multipart form: it streams straight to disk
+// instead of being buffered, and the original file name rides along in the query.
+// Kestrel's default body limit is 30 MB, which a 1.0 world passes easily.
+app.MapPost("/api/backups/upload", async (HttpContext ctx, string? name) => {
+    IHttpMaxRequestBodySizeFeature? limit = ctx.Features.Get<IHttpMaxRequestBodySizeFeature>();
+    if(limit != null && !limit.IsReadOnly) limit.MaxRequestBodySize = Backups.MaxUploadBytes;
+
+    try {
+        return Results.Ok(await Backups.ImportAsync(ctx.Request.Body, name ?? "", ctx.RequestAborted));
+    } catch(BadHttpRequestException ex) when(ex.StatusCode == StatusCodes.Status413PayloadTooLarge) {
+        return Results.Json(new { error = $"Größer als {Backups.MaxUploadBytes / 1073741824} GB — abgelehnt." }, statusCode: ex.StatusCode);
     } catch(Exception ex) {
         return Results.BadRequest(new { error = ex.Message });
     }

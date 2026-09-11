@@ -23,10 +23,16 @@ public static partial class Backups {
     /// <summary>Temporary backups pruned past this count. Permanent ones are never touched.</summary>
     const int keepTemporary = 10;
 
+    /// <summary>Uploads past this are refused. A world is tens to a few hundred MB; this only stops a full disk.</summary>
+    public const long MaxUploadBytes = 4L * 1024 * 1024 * 1024;
+
     // The strict shape is also the guard for restore and delete: a name that does not
     // match never reaches the filesystem.
     [GeneratedRegex(@"^(\d{8}-\d{6})_(perma|temp)_(.+)\.tar\.gz$")]
     private static partial Regex BackupNameRegex();
+
+    [GeneratedRegex(@"^(.+)\.(db|fwl)(\.old)?$")]
+    private static partial Regex LooseWorldFileRegex();
 
     public static List<BackupInfo> List() {
         if(!Directory.Exists(BackupDir)) return new List<BackupInfo>();
@@ -165,6 +171,56 @@ public static partial class Backups {
         if(File.Exists(path)) File.Delete(path);
     }
 
+    /// <summary>The archive on disk for a download, or null. Goes through the same name check as everything else.</summary>
+    public static string? PathOf(string fileName) {
+        BackupInfo? info = describe(fileName);
+        if(info == null) return null;
+        string path = Path.Combine(BackupDir, info.FileName);
+        return File.Exists(path) ? path : null;
+    }
+
+    /// <summary>
+    /// Files an archive from outside -- one downloaded from here earlier, or a world packed by
+    /// hand -- as a permanent backup. It is not unpacked; that is what restore is for. Permanent,
+    /// because it was put here on purpose and a temporary one with an old timestamp would be the
+    /// first thing the next prune throws away.
+    /// </summary>
+    public static async Task<BackupInfo> ImportAsync(Stream body, string uploadName, CancellationToken cancel) {
+        Directory.CreateDirectory(BackupDir);
+        File.SetUnixFileMode(BackupDir, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+        // Not *.tar.gz, so List() does not see a half-received upload.
+        string part = Path.Combine(BackupDir, $".upload-{Guid.NewGuid():N}.part");
+        try {
+            using(FileStream file = new FileStream(part, FileMode.CreateNew, FileAccess.Write)) {
+                await body.CopyToAsync(file, cancel);
+            }
+
+            string world = await inspectAsync(part);
+
+            // A re-uploaded download keeps its timestamp, so the list still says when that
+            // world state is from. Anything else is dated by its arrival.
+            Match match = BackupNameRegex().Match(uploadName);
+            bool dated = DateTime.TryParseExact(match.Success ? match.Groups[1].Value : "", "yyyyMMdd-HHmmss", null,
+                System.Globalization.DateTimeStyles.None, out DateTime stamp);
+            if(!dated) stamp = DateTime.Now;
+
+            string name = $"{stamp:yyyyMMdd-HHmmss}_perma_{sanitize(world)}.tar.gz";
+            if(dated && File.Exists(Path.Combine(BackupDir, name))) {
+                throw new Exception($"Die Sicherung {name} liegt bereits vor.");
+            }
+            while(File.Exists(Path.Combine(BackupDir, name))) {
+                stamp = stamp.AddSeconds(1);
+                name = $"{stamp:yyyyMMdd-HHmmss}_perma_{sanitize(world)}.tar.gz";
+            }
+
+            File.Move(part, Path.Combine(BackupDir, name));
+            return describe(name) ?? throw new Exception("Sicherung nach dem Hochladen nicht lesbar.");
+        } finally {
+            try { File.Delete(part); } catch { }
+        }
+    }
+
     /// <summary>
     /// Throws away the current world so Valheim generates a fresh one on the next start.
     /// The permanent backup is made first and its success is the precondition for
@@ -257,6 +313,78 @@ public static partial class Backups {
             return slash > 0 ? entry[..slash] : null;
         }
         throw new Exception("Das Archiv ist leer.");
+    }
+
+    /// <summary>
+    /// Checks that an uploaded archive is a world and nothing else, and returns the world's name.
+    ///
+    /// Restore trusts what it unpacks: it deletes the directory named by the first entry and
+    /// extracts into worlds_local. That is fine for archives the panel wrote and not for one
+    /// that came in over HTTP, so an upload has to look exactly like ours -- regular files and
+    /// directories only, and either one world directory or the loose files of a pre-1.0 world.
+    /// "./Welt/..." is refused too: restore would read "." as the directory and delete worlds_local.
+    /// </summary>
+    static async Task<string> inspectAsync(string archivePath) {
+        ShellResult names = await Shell.RunAsync("/usr/bin/tar", ["-tzf", archivePath], 300);
+        ShellResult details = await Shell.RunAsync("/usr/bin/tar", ["-tvzf", archivePath], 300);
+        if(!names.Ok || !details.Ok) throw new Exception("Das ist kein lesbares tar.gz-Archiv.");
+
+        // Two listings of the same archive, paired by line. tar escapes control characters in
+        // names, so no name can spread over two lines and shift the pairing.
+        return worldOf(listing(names.StdOut), listing(details.StdOut));
+    }
+
+    /// <summary>The judgement half of inspectAsync: `tar -t` names and `tar -tv` lines in, world name out.</summary>
+    static string worldOf(List<string> entries, List<string> verbose) {
+        if(entries.Count == 0) throw new Exception("Das Archiv ist leer.");
+        if(entries.Count != verbose.Count) throw new Exception("Das Archiv lässt sich nicht eindeutig lesen.");
+
+        const string expected = "Erwartet wird der Weltordner (oder die alten .db/.fwl-Dateien) direkt auf oberster Ebene, "
+            + "gepackt z. B. mit: tar -czf welt.tar.gz -C worlds_local MeineWelt";
+
+        for(int i = 0; i < entries.Count; i++) {
+            string entry = entries[i];
+
+            // "-" file, "d" directory. Links ("l", "h") and devices could point out of worlds_local.
+            char type = verbose[i][0];
+            if(type != '-' && type != 'd') throw new Exception($"\"{entry}\" ist weder Datei noch Verzeichnis (z. B. ein Link). Abgelehnt.");
+
+            // tar prints anything outside plain ASCII as \ooo, and restore would then look for a
+            // directory by that escaped name and not find it.
+            if(entry.Contains('\\')) throw new Exception($"\"{entry}\" enthält Sonderzeichen, die das Wiederherstellen nicht verarbeiten kann.");
+
+            string[] segments = entry.TrimEnd('/').Split('/');
+            if(entry.StartsWith('/') || segments.Any(s => s.Length == 0 || s == "." || s == "..")) {
+                throw new Exception($"Ungültiger Pfad im Archiv: \"{entry}\". {expected}");
+            }
+        }
+
+        if(entries.All(e => e.Contains('/'))) {
+            List<string> tops = entries.Select(e => e[..e.IndexOf('/')]).Distinct().ToList();
+            if(tops.Count != 1) throw new Exception($"Das Archiv enthält mehrere Ordner ({string.Join(", ", tops)}). {expected}");
+
+            bool hasWorld = entries.Any(e => e.EndsWith(".db2") || e.EndsWith(".fwl2"));
+            if(!hasWorld) throw new Exception($"Im Ordner \"{tops[0]}\" liegt keine Valheim-Welt (.db2/.fwl2). {expected}");
+            return tops[0];
+        }
+
+        if(entries.Any(e => e.Contains('/'))) throw new Exception($"Das Archiv mischt Ordner und lose Dateien. {expected}");
+
+        List<Match> files = entries.Select(e => LooseWorldFileRegex().Match(e)).ToList();
+        if(files.Any(m => !m.Success)) {
+            throw new Exception($"\"{entries[files.FindIndex(m => !m.Success)]}\" ist keine Weltdatei. {expected}");
+        }
+
+        List<string> worlds = files.Select(m => m.Groups[1].Value).Distinct().ToList();
+        if(worlds.Count != 1) throw new Exception($"Das Archiv enthält mehrere Welten ({string.Join(", ", worlds)}).");
+        if(!entries.Contains($"{worlds[0]}.db") || !entries.Contains($"{worlds[0]}.fwl")) {
+            throw new Exception($"Zur Welt \"{worlds[0]}\" fehlt die .db oder die .fwl.");
+        }
+        return worlds[0];
+    }
+
+    static List<string> listing(string output) {
+        return output.Split('\n').Select(l => l.TrimEnd('\r')).Where(l => l.Length > 0).ToList();
     }
 
     static BackupInfo? describe(string fileName) {
