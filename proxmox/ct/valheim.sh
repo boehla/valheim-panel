@@ -234,3 +234,12 @@ msg_ok "Completed Successfully!\n"
 echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
 echo -e "${INFO}${YW}Access it using the following URL:${CL}"
 echo -e "${GATEWAY}${BGN}http://${IP}:8099${CL}"
+# The panel refuses every request without this token, and it only exists inside the
+# container. Plain echo rather than msg_*, which also write to the build log.
+PANEL_TOKEN="$(pct exec "$CTID" -- awk -F= '$1 == "PANEL_TOKEN" {print $2}' /opt/valheim-panel/.env 2>/dev/null || true)"
+if [[ -n "$PANEL_TOKEN" ]]; then
+  echo -e "${INFO}${YW}Log in with this access token:${CL}"
+  echo -e "${TAB}🔑${TAB}${BGN}${PANEL_TOKEN}${CL}"
+else
+  echo -e "${INFO}${YW}The access token is in /opt/valheim-panel/.env inside the container${CL}"
+fi

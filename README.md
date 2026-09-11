@@ -20,8 +20,9 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/boehla/valheim-panel/mai
 Defaults: Debian 13, 4 cores, 8 GB RAM, 16 GB disk, unprivileged. The initial
 SteamCMD download is around 2.5 GB, so the first run takes a while.
 
-When it finishes, open `http://<container-ip>:8099`. The access token is in
-`/opt/valheim-panel/.env`.
+When it finishes, the script prints the panel URL (`http://<container-ip>:8099`) and the
+access token to log in with. The token lives in `/opt/valheim-panel/.env`; to read it again
+later, run `pct exec <CTID> -- cat /opt/valheim-panel/.env` on the host.
 
 ## What lives where
 

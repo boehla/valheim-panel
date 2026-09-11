@@ -33,7 +33,7 @@
   },
   "notes": [
     {
-      "text": "The panel access token is generated during install and stored in /opt/valheim-panel/.env.",
+      "text": "The panel access token is generated during install, printed at the end of it, and stored in /opt/valheim-panel/.env.",
       "type": "info"
     },
     {
