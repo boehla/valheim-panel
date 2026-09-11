@@ -262,4 +262,4 @@ record RestoreRequest(string FileName);
 record RegenerateRequest(string Confirm, string? NewWorldName);
 record ModRequest(string FullName);
 record ToggleRequest(bool Value);
-record ConfigWriteRequest(string Path, string Text, long Stamp);
+record ConfigWriteRequest(string Path, string Text, string Stamp);

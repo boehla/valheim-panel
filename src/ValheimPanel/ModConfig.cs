@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace ValheimPanel;
@@ -23,8 +24,12 @@ public class ConfigContent {
     public string Text { get; set; } = "";
     public DateTime ModifiedAt { get; set; }
 
-    /// <summary>Last write time in ticks — handed back on save so a foreign change is noticed.</summary>
-    public long Stamp { get; set; }
+    /// <summary>
+    /// Last write time in ticks — handed back on save so a foreign change is noticed. A string,
+    /// not a number: the ticks sit around 6.4e17, far past the 2^53 a JavaScript number holds
+    /// exactly, so the browser rounded them on parse and every save came back as a conflict.
+    /// </summary>
+    public string Stamp { get; set; } = "";
     public bool HasBackup { get; set; }
 }
 
@@ -115,7 +120,7 @@ public static class ModConfig {
     /// browser started from: when it no longer matches, somebody — most likely BepInEx on the
     /// last shutdown — has written the file in the meantime, and saving would throw that away.
     /// </summary>
-    public static ConfigContent Write(string relativePath, string text, long stamp) {
+    public static ConfigContent Write(string relativePath, string text, string stamp) {
         string full = resolve(relativePath);
         if(!File.Exists(full)) throw new Exception("Diese Datei gibt es nicht mehr.");
 
@@ -247,7 +252,7 @@ public static class ModConfig {
         return Path.GetRelativePath(ServerControl.ServerDir, full).Replace('\\', '/');
     }
 
-    static long stampOf(string full) {
-        return File.GetLastWriteTimeUtc(full).Ticks;
+    static string stampOf(string full) {
+        return File.GetLastWriteTimeUtc(full).Ticks.ToString(CultureInfo.InvariantCulture);
     }
 }
